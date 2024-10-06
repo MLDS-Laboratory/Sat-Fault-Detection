@@ -1,40 +1,33 @@
 # LTS support
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
-# non-interactive installs
-ENV DEBIAN_FRONTEND=noninteractive
+# Update current software
+RUN apt-get update
 
-# required packages
-RUN apt-get update && \
-    apt-get install -y \
-    git \
-    build-essential \
-    python3 \
-    python3-dev \
-    python3-pip \
-    python3-venv \
-    swig \
-    cmake \
-    python3-tk \
-    && apt-get clean
+# Install necessary packages
+RUN apt-get install -y git build-essential python3 python3-setuptools python3-dev python3-pip python3.10-venv swig cmake
 
-# clone the Basilisk repository
-RUN git clone https://github.com/AVSLab/basilisk.git /opt/basilisk
-WORKDIR /opt/basilisk
+# Clone the Basilisk repository
+RUN git clone https://github.com/AVSLab/basilisk.git 
+WORKDIR /basilisk
 
-# python venv setup
-RUN python3 -m venv .venv && \
-    . .venv/bin/activate && \
-    pip install --upgrade pip
+# Create a Python virtual environment
+RUN python3 -m venv .venv
 
-# use conan to install https://hanspeterschaub.info/basilisk/Install/installOnLinux.html
-RUN . .venv/bin/activate && \
-    pip install wheel 'conan<2.0' cmake \
-    pandas matplotlib numpy<=2.0.1 colorama tqdm Pillow pytest pytest-html pytest-xdist
+# Activate the virtual environment and install pip dependencies
+RUN /bin/bash -c "source .venv/bin/activate && pip install --upgrade pip && pip install wheel 'conan<2.0' cmake"
 
-# Conan to build Basilisk
-RUN . .venv/bin/activate && \
-    python3 conanfile.py
+# Initialize the default Conan profile
+RUN /bin/bash -c "source .venv/bin/activate && conan profile new default --detect"
 
-# Entry point to ensure the virtual environment is activated when running commands
-ENTRYPOINT ["/bin/bash", "-c", "source .venv/bin/activate && exec \"$@\"", "--"]
+# Update Conan profile settings
+RUN /bin/bash -c "source .venv/bin/activate && conan profile update settings.compiler.libcxx=libstdc++11 default"
+
+# Install dependencies with Conan
+RUN /bin/bash -c "source .venv/bin/activate && conan install . --build=missing -s build_type=Release"
+
+# Run the Basilisk build
+RUN /bin/bash -c "source .venv/bin/activate && /basilisk/.venv/bin/python3 conanfile.py"
+
+# Default command
+CMD ["/bin/bash"]
