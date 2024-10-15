@@ -35,24 +35,18 @@ RUN /bin/bash -c "source .venv/bin/activate && /basilisk/.venv/bin/python3 conan
 # Install Python dependencies for PostgreSQL and additional requirements
 RUN /bin/bash -c "source .venv/bin/activate && pip install psycopg2-binary"
 
-# Setup PostgreSQL environment variables
-ENV POSTGRES_HOST=localhost
-ENV POSTGRES_DB=telemetry_db
-ENV POSTGRES_USER=postgres
-ENV POSTGRES_PASSWORD=postgres
+# Modify pg_hba.conf to use trust authentication for all connections
+RUN sed -i "s/peer/trust/g" /etc/postgresql/14/main/pg_hba.conf && \
+    sed -i "s/scram-sha-256/trust/g" /etc/postgresql/14/main/pg_hba.conf
 
-# Ensure the PostgreSQL service is started and database/user setup is done
+# Start PostgreSQL service and set up the database and user
 RUN service postgresql start && \
     su - postgres -c "psql -c \"CREATE DATABASE telemetry_db;\"" && \
     su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='postgres'\" | grep -q 1 || psql -c \"CREATE USER postgres WITH PASSWORD 'postgres';\"" && \
     su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE telemetry_db TO postgres;\""
 
-
-# Copy the data generator script to the container
-# COPY data_generator.py /app/data_generator.py
-
-# Make sure the working directory is /basilisk
+# Set the working directory to /basilisk
 WORKDIR /basilisk
 
-# Default command to run Bash and allow user interaction with both Basilisk and PostgreSQL
-CMD ["/bin/bash"]
+# Default command to start PostgreSQL and allow interaction
+CMD service postgresql start && /bin/bash

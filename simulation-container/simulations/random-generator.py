@@ -2,13 +2,14 @@ import random
 import time
 import psycopg2
 from psycopg2 import sql
+import json  # Ensure you import json for telemetry data
 
 def generate_data(simulation_id, is_constellation=False, satellites=1):
+    # Remove the password field and use 127.0.0.1 instead of localhost
     conn = psycopg2.connect(
-        host="localhost",
+        host="127.0.0.1",  # Use IPv4 loopback to avoid any IPv6 issues
         database="telemetry_db",
         user="postgres",
-        password="postgres"
     )
     cursor = conn.cursor()
 
@@ -43,4 +44,4 @@ def generate_data(simulation_id, is_constellation=False, satellites=1):
     conn.close()
 
 if __name__ == "__main__":
-    generate_data(simulation_id=1, is_constellation=True, satellites=3)
+    generate_data(simulation_id=random.uniform(0, 20000), is_constellation=True, satellites=3)
