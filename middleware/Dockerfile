@@ -4,7 +4,6 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y libpq-dev && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
 RUN pip install --no-cache-dir psycopg2-binary kafka-python
 
 COPY middleware.py ./
