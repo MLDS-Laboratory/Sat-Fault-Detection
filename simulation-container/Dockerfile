@@ -1,6 +1,8 @@
 # Base image using Ubuntu with LTS support for Basilisk
 FROM ubuntu:22.04
 
+ARG DEBIAN_FRONTEND=noninteractive
+
 # Update current software
 RUN apt-get update
 
@@ -39,14 +41,15 @@ ENV POSTGRES_DB=telemetry_db
 ENV POSTGRES_USER=postgres
 ENV POSTGRES_PASSWORD=postgres
 
-# Ensure the PostgreSQL service is started
+# Ensure the PostgreSQL service is started and database/user setup is done
 RUN service postgresql start && \
     su - postgres -c "psql -c \"CREATE DATABASE telemetry_db;\"" && \
-    su - postgres -c "psql -c \"CREATE USER postgres WITH PASSWORD 'postgres';\"" && \
+    su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='postgres'\" | grep -q 1 || psql -c \"CREATE USER postgres WITH PASSWORD 'postgres';\"" && \
     su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE telemetry_db TO postgres;\""
 
+
 # Copy the data generator script to the container
-COPY data_generator.py /app/data_generator.py
+# COPY data_generator.py /app/data_generator.py
 
 # Make sure the working directory is /basilisk
 WORKDIR /basilisk

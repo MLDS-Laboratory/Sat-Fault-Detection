@@ -5,7 +5,7 @@ from psycopg2 import sql
 
 def generate_data(simulation_id, is_constellation=False, satellites=1):
     conn = psycopg2.connect(
-        host="postgres",
+        host="localhost",
         database="telemetry_db",
         user="postgres",
         password="postgres"
