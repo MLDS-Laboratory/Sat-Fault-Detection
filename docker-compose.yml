@@ -1,14 +1,14 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:13
+  simulation:
+    build: ./simulation-container
+    volumes:
+      - ./simulation-container/simulations:/basilisk/simulations
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres # password isn't really needed since all security is set to trust
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: telemetry_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     networks:
       - telemetry-network
 
@@ -28,13 +28,6 @@ services:
     image: bitnami/zookeeper:latest
     environment:
       ALLOW_ANONYMOUS_LOGIN: 'yes'
-    networks:
-      - telemetry-network
-
-  simulation:
-    build: ./simulation-container
-    depends_on:
-      - postgres
     networks:
       - telemetry-network
 
@@ -65,6 +58,8 @@ services:
 
   anomaly_detection:
     build: ./anomaly-detection
+    volumes:
+      - ./anomaly-detection/models:/anomaly_detection
     depends_on:
       - kafka
     networks:
