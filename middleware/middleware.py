@@ -1,0 +1,56 @@
+import time
+import threading
+from kafka import KafkaProducer
+import psycopg2
+from psycopg2 import sql
+import json
+
+def stream_data(table_name, satellite_id=None):
+    conn = psycopg2.connect(
+        host="postgres",
+        database="telemetry_db",
+        user="postgres",
+        password="postgres"
+    )
+    cursor = conn.cursor()
+    producer = KafkaProducer(bootstrap_servers='kafka:9092', value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+
+    query = sql.SQL("SELECT time, satellite_id, data FROM {}").format(sql.Identifier(table_name))
+    if satellite_id:
+        query += sql.SQL(" WHERE satellite_id = %s")
+        cursor.execute(query, (satellite_id,))
+    else:
+        cursor.execute(query)
+
+    rows = cursor.fetchall()
+    for i, row in enumerate(rows):
+        message = {
+            "time": row[0],
+            "satellite_id": row[1],
+            "data": row[2]
+        }
+        producer.send('telemetry', value=message)
+        if i < len(rows) - 1:
+            next_time = rows[i + 1][0]
+            current_time = row[0]
+            time.sleep(max(0, next_time - current_time))
+    producer.flush()
+
+    cursor.close()
+    conn.close()
+
+if __name__ == "__main__":
+    table_name = "simulation_1"
+    is_constellation = True
+    satellites = 3
+
+    if is_constellation:
+        threads = []
+        for sat_id in range(1, satellites + 1):
+            t = threading.Thread(target=stream_data, args=(table_name, sat_id))
+            threads.append(t)
+            t.start()
+        for t in threads:
+            t.join()
+    else:
+        stream_data(table_name)
