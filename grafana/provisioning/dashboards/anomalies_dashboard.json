@@ -15,8 +15,8 @@
     "editable": true,
     "gnetId": null,
     "graphTooltip": 0,
-    "id": 2,
-    "iteration": 1627852000000,
+    "id": 3,
+    "iteration": 1627853000000,
     "links": [],
     "panels": [
       {
@@ -33,7 +33,7 @@
           "x": 0,
           "y": 0
         },
-        "id": 3,
+        "id": 4,
         "options": {
           "legend": {
             "calcs": [],
@@ -47,45 +47,54 @@
         "pluginVersion": "7.5.5",
         "targets": [
           {
-            "query": "SELECT mean(\"velocity\") AS \"Velocity\" FROM \"telemetry_data\" WHERE $timeFilter GROUP BY time($__interval), \"satellite_id\" fill(null)",
+            "query": "SELECT count(\"metric\") AS \"Total Anomalies\" FROM \"anomalies\" WHERE $timeFilter GROUP BY time($__interval) fill(0)",
             "refId": "A"
           }
         ],
-        "title": "Constellation Velocity Comparison",
+        "title": "Total Anomalies Over Time",
         "type": "timeseries"
+      },
+      {
+        "datasource": "InfluxDB",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {}
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 24,
+          "x": 0,
+          "y": 10
+        },
+        "id": 5,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "pluginVersion": "7.5.5",
+        "targets": [
+          {
+            "query": "SELECT \"anomalous_value\", \"metric\", \"anomaly_model\", \"message\" FROM \"anomalies\" WHERE $timeFilter",
+            "refId": "A"
+          }
+        ],
+        "title": "Anomaly Details",
+        "type": "table"
       }
     ],
     "schemaVersion": 27,
     "style": "dark",
     "tags": [],
     "templating": {
-      "list": [
-        {
-          "current": {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
-          "hide": 0,
-          "label": "Field",
-          "name": "field",
-          "options": [
-            {
-              "selected": false,
-              "text": "velocity",
-              "value": "velocity"
-            },
-            {
-              "selected": false,
-              "text": "position",
-              "value": "position"
-            }
-          ],
-          "query": "",
-          "skipUrlSync": false,
-          "type": "custom"
-        }
-      ]
+      "list": []
     },
     "time": {
       "from": "now-6h",
@@ -93,8 +102,8 @@
     },
     "timepicker": {},
     "timezone": "",
-    "title": "Constellation Dashboard",
-    "uid": "constellation_dashboard",
+    "title": "Anomalies Dashboard",
+    "uid": "anomalies_dashboard",
     "version": 1
   }
   

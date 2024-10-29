@@ -5,6 +5,10 @@ from psycopg2 import sql
 import json
 import threading
 from kafka import KafkaProducer
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 # Middleware Function
 def stream_data(table_name, kafka_topic='telemetry', satellite_id=None):
@@ -40,9 +44,7 @@ def stream_data(table_name, kafka_topic='telemetry', satellite_id=None):
             current_time = row[0]
             time.sleep(max(0, next_time - current_time))
     producer.flush()
-
-    cursor.close()
-    conn.close()
+    logging.info("Data streaming completed.")
 
 if __name__ == "__main__":
     # Simulation Parameters
