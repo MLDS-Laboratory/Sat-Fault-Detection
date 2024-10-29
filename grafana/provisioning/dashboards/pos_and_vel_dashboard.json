@@ -1,0 +1,132 @@
+{
+    "annotations": {
+      "list": []
+    },
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "id": null,
+    "links": [],
+    "panels": [
+      {
+        "datasource": "InfluxDB",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {}
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "query": "SELECT \"data_position\" FROM \"telemetry_data\" WHERE \"satellite_id\" = '$satellite_id'",
+            "refId": "A",
+            "resultFormat": "time_series",
+            "measurement": "telemetry_data",
+            "alias": "Data Position"
+          }
+        ],
+        "title": "Data Position vs Time",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "InfluxDB",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {}
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        },
+        "id": 2,
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "query": "SELECT \"data_velocity\" FROM \"telemetry_data\" WHERE \"satellite_id\" = '$satellite_id'",
+            "refId": "A",
+            "resultFormat": "time_series",
+            "measurement": "telemetry_data",
+            "alias": "Data Velocity"
+          }
+        ],
+        "title": "Data Velocity vs Time",
+        "type": "timeseries"
+      }
+    ],
+    "schemaVersion": 30,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+      "list": [
+        {
+          "allValue": null,
+          "current": {
+            "selected": true,
+            "text": "1",
+            "value": "1"
+          },
+          "datasource": "InfluxDB",
+          "definition": "",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Satellite ID",
+          "multi": false,
+          "name": "satellite_id",
+          "options": [],
+          "query": "SHOW TAG VALUES WITH KEY = \"satellite_id\"",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 1,
+          "tagValuesQuery": "",
+          "tags": [],
+          "type": "query",
+          "useTags": false
+        }
+      ]
+    },
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Telemetry Dashboard",
+    "uid": "telemetry-dashboard",
+    "version": 1
+  }
+  

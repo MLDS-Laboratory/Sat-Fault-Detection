@@ -1,5 +1,6 @@
 import numpy as np
 from anomaly_detection_model import AnomalyDetectionModel
+import logging
 
 class OutlierDetectionModel(AnomalyDetectionModel):
     """
@@ -20,6 +21,8 @@ class OutlierDetectionModel(AnomalyDetectionModel):
         velocity = data.get('velocity', None)
         if velocity is None:
             return False, {}
+        
+        logging.info(f'Velocity: {velocity}')
         
         # Simple z-score based outlier detection
         mean = 5

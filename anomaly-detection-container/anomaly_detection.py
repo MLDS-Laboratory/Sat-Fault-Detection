@@ -31,9 +31,10 @@ class AnomalyDetectionManager:
         with open(config_path, 'r') as f:
             config = json.load(f)
 
-        active_models = config.get('active_models', [])
+        active_models = config.get('active_models', {})
         for model_name in active_models:
-            model_file = f"{model_name.lower()}.py"
+
+            model_file = str(active_models[model_name])
             model_path = os.path.join(MODELS_DIR, model_file)
             if not os.path.exists(model_path):
                 logging.warning(f"Model file {model_file} not found in {MODELS_DIR}. Skipping.")
