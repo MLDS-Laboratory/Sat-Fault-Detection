@@ -37,10 +37,9 @@ def generate_data(simulation_id, is_constellation=False, satellites=1):
                 VALUES (%s, %s, %s);
             """).format(sql.Identifier(table_name)), (t, sat_id, json.dumps(telemetry_data)))
         conn.commit()
-        time.sleep(0.1)  # Simulate real-time intervals
 
     cursor.close()
     conn.close()
 
 if __name__ == "__main__":
-    generate_data(simulation_id=random.uniform(0, 20000), is_constellation=True, satellites=3)
+    generate_data(simulation_id=1, is_constellation=True, satellites=3)

@@ -7,8 +7,10 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
 
 # Install necessary packages for Basilisk and PostgreSQL
-RUN apt-get install -y git build-essential python3 python3-setuptools python3-dev python3-pip python3.10-venv swig cmake \
-    libpq-dev postgresql postgresql-contrib
+RUN apt-get update && \
+    apt-get install -y git build-essential python3 python3-setuptools python3-dev python3-pip python3.10-venv swig cmake \
+    libpq-dev postgresql postgresql-contrib && \
+    rm -rf /var/lib/apt/lists/*
 
 # Clone the Basilisk repository
 RUN git clone https://github.com/AVSLab/basilisk.git 
@@ -33,7 +35,9 @@ RUN /bin/bash -c "source .venv/bin/activate && conan install . --build=missing -
 RUN /bin/bash -c "source .venv/bin/activate && /basilisk/.venv/bin/python3 conanfile.py"
 
 # Install Python dependencies for PostgreSQL and additional requirements
-RUN /bin/bash -c "source .venv/bin/activate && pip install psycopg2-binary"
+RUN /bin/bash -c "source .venv/bin/activate && pip install psycopg2-binary kafka-python"
+
+COPY middleware.py ./
 
 # Modify pg_hba.conf to use trust authentication for all connections
 RUN sed -i "s/peer/trust/g" /etc/postgresql/14/main/pg_hba.conf && \
@@ -44,6 +48,9 @@ RUN service postgresql start && \
     su - postgres -c "psql -c \"CREATE DATABASE telemetry_db;\"" && \
     su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='postgres'\" | grep -q 1 || psql -c \"CREATE USER postgres WITH PASSWORD 'postgres';\"" && \
     su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE telemetry_db TO postgres;\""
+
+# Expose PostgreSQL port if needed
+# EXPOSE 5432
 
 # Set the working directory to /basilisk
 WORKDIR /basilisk
