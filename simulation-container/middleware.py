@@ -21,6 +21,7 @@ def stream_data(table_name, kafka_topic='telemetry', satellite_id=None):
     cursor = conn.cursor()
     producer = KafkaProducer(
         bootstrap_servers='kafka:9092',
+        api_version=(0, 10, 1),
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
 

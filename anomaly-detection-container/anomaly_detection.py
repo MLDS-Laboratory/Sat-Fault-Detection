@@ -106,6 +106,7 @@ def main():
     consumer = KafkaConsumer(
         'telemetry',
         bootstrap_servers='kafka:9092',
+        api_version=(0, 10, 1),
         value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         auto_offset_reset='earliest',
         group_id='anomaly_detection_group'
