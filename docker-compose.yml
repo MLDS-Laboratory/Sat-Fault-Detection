@@ -2,9 +2,9 @@ version: '3.8'
 
 services:
   sim_middleware:
-    build: ./sim_middleware-container
+    build: ./simulation-container
     volumes:
-      - ./sim_middleware-container/simulations:/basilisk/simulations
+      - ./simulation-container/simulations:/basilisk/simulations
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -49,6 +49,7 @@ services:
     volumes:
       - ./anomaly-detection-container:/app
       - ./anomaly-detection-container/models:/app/models
+      - ./anomaly-detection-container/config.json:/app/config.json
     depends_on:
       - kafka
       - influx_telegraf

@@ -47,86 +47,12 @@
         "pluginVersion": "7.5.5",
         "targets": [
           {
-            "query": "SELECT mean(\"position\") AS \"Position\" FROM \"telemetry_data\" WHERE \"satellite_id\" = '$satellite_id' GROUP BY time($__interval) fill(null)",
+            "query": "SELECT mean(\"velocity\") AS \"Velocity\" FROM \"telemetry_data\" WHERE \"satellite_id\" = '$satellite_id' AND $timeFilter GROUP BY time($__interval) fill(null)",
             "refId": "A"
-          },
-          {
-            "query": "SELECT mean(\"velocity\") AS \"Velocity\" FROM \"telemetry_data\" WHERE \"satellite_id\" = '$satellite_id' GROUP BY time($__interval) fill(null)",
-            "refId": "B"
           }
         ],
-        "title": "Satellite Telemetry",
+        "title": "Satellite Velocity Over Time",
         "type": "timeseries"
-      },
-      {
-        "datasource": "InfluxDB",
-        "fieldConfig": {
-          "defaults": {
-            "custom": {}
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 9,
-          "w": 24,
-          "x": 0,
-          "y": 10
-        },
-        "id": 3,
-        "options": {
-          "legend": {
-            "calcs": [],
-            "displayMode": "list",
-            "placement": "bottom"
-          },
-          "tooltip": {
-            "mode": "single"
-          }
-        },
-        "pluginVersion": "7.5.5",
-        "targets": [
-          {
-            "query": "SELECT count(\"metric\") AS \"Anomalies\" FROM \"anomalies\" WHERE \"satellite_id\" = '$satellite_id' GROUP BY time($__interval) fill(0)",
-            "refId": "A"
-          }
-        ],
-        "title": "Anomalies Over Time",
-        "type": "timeseries"
-      },
-      {
-        "datasource": "InfluxDB",
-        "fieldConfig": {
-          "defaults": {
-            "custom": {}
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 9,
-          "w": 24,
-          "x": 0,
-          "y": 19
-        },
-        "id": 4,
-        "options": {
-          "legend": {
-            "calcs": [],
-            "displayMode": "list",
-            "placement": "bottom"
-          },
-          "tooltip": {
-            "mode": "single"
-          }
-        },
-        "pluginVersion": "7.5.5",
-        "targets": [
-          {
-            "query": "SELECT \"metric\", \"value\" FROM \"anomalies\" WHERE \"satellite_id\" = '$satellite_id'",
-            "refId": "A"
-          }
-        ],
-        "title": "Anomaly Details",
-        "type": "table"
       }
     ],
     "schemaVersion": 27,
@@ -147,6 +73,31 @@
           "query": "SHOW TAG VALUES WITH KEY = \"satellite_id\"",
           "skipUrlSync": false,
           "type": "query"
+        },
+        {
+          "current": {
+            "selected": false,
+            "text": "All",
+            "value": "$__all"
+          },
+          "hide": 0,
+          "label": "Field",
+          "name": "field",
+          "options": [
+            {
+              "selected": false,
+              "text": "position",
+              "value": "position"
+            },
+            {
+              "selected": false,
+              "text": "velocity",
+              "value": "velocity"
+            }
+          ],
+          "query": "",
+          "skipUrlSync": false,
+          "type": "custom"
         }
       ]
     },
@@ -156,8 +107,8 @@
     },
     "timepicker": {},
     "timezone": "",
-    "title": "Satellite Telemetry and Anomalies Dashboard",
-    "uid": "satellite_telemetry_anomalies",
+    "title": "Satellite Telemetry Dashboard",
+    "uid": "satellite_telemetry",
     "version": 1
   }
   

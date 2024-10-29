@@ -2,38 +2,54 @@ import os
 import sys
 import json
 import importlib.util
-from kafka import KafkaConsumer
+import logging
+from kafka import KafkaConsumer, KafkaProducer
 from influxdb import InfluxDBClient
 
-# Path to the models directory
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+
+# Path to the models directory and config file
 MODELS_DIR = os.path.join(os.path.dirname(__file__), 'models')
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
 
 class AnomalyDetectionManager:
-    
-    def __init__(self, influx_host='influxdb', influx_port=8086, influx_db='telemetry_db'):
+    def __init__(self, influx_host='influx_telegraf', influx_port=8086, influx_db='telemetry_db', config_path=CONFIG_FILE):
         self.models = []
-        self.load_models()
+        self.load_models(config_path)
         self.influx_client = InfluxDBClient(host=influx_host, port=influx_port, database=influx_db)
         self.ensure_anomalies_measurement()
 
-    def load_models(self):
+    def load_models(self, config_path):
         """
-        Dynamically load all anomaly detection models from the models directory.
+        Dynamically load all active anomaly detection models from the config file.
         """
-        for filename in os.listdir(MODELS_DIR):
-            if filename.endswith('.py') and filename != 'anomaly_detection_model.py':
-                module_name = filename[:-3]
-                module_path = os.path.join(MODELS_DIR, filename)
-                spec = importlib.util.spec_from_file_location(module_name, module_path)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
+        if not os.path.exists(config_path):
+            logging.error(f"Configuration file {config_path} not found.")
+            sys.exit(1)
 
-                # Find the class that inherits from AnomalyDetectionModel
-                for attr in dir(module):
-                    cls = getattr(module, attr)
-                    if isinstance(cls, type) and issubclass(cls, module.anomaly_detection_model.AnomalyDetectionModel) and cls is not module.anomaly_detection_model.AnomalyDetectionModel:
-                        self.models.append(cls())
-                        print(f"Loaded model: {cls.__name__}")
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+        active_models = config.get('active_models', [])
+        for model_name in active_models:
+            model_file = f"{model_name.lower()}.py"
+            model_path = os.path.join(MODELS_DIR, model_file)
+            if not os.path.exists(model_path):
+                logging.warning(f"Model file {model_file} not found in {MODELS_DIR}. Skipping.")
+                continue
+
+            spec = importlib.util.spec_from_file_location(model_name, model_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            # Instantiate the model
+            model_class = getattr(module, model_name, None)
+            if model_class and issubclass(model_class, module.AnomalyDetectionModel):
+                self.models.append(model_class())
+                logging.info(f"Loaded model: {model_name}")
+            else:
+                logging.warning(f"Model class {model_name} not found or does not inherit from AnomalyDetectionModel.")
 
     def ensure_anomalies_measurement(self):
         """
@@ -48,12 +64,14 @@ class AnomalyDetectionManager:
 
         Parameters:
             data (dict): The telemetry data.
-
         """
         for model in self.models:
-            is_anomaly, details = model.detect(data)
-            if is_anomaly:
-                self.record_anomaly(data, details)
+            try:
+                is_anomaly, details = model.detect(data)
+                if is_anomaly:
+                    self.record_anomaly(data, details)
+            except Exception as e:
+                logging.error(f"Error in model {model.__class__.__name__}: {e}")
 
     def record_anomaly(self, data, details):
         """
@@ -67,17 +85,17 @@ class AnomalyDetectionManager:
             "measurement": "anomalies",
             "tags": {
                 "satellite_id": str(data.get('satellite_id', 'unknown')),
-                "anomaly_type": details.get('anomaly_type', 'unknown')
+                "anomaly_model": details.get('anomaly_type', 'unknown')
             },
             "time": data.get('time'),
             "fields": {
                 "metric": details.get('metric', 'unknown'),
-                "value": details.get('value', 0),
-                "additional_info": json.dumps(details)
+                "anomalous_value": details.get('value', 0),
+                "message": details.get('message', '')
             }
         }
         self.influx_client.write_points([anomaly])
-        print(f"Anomaly detected and recorded: {anomaly}")
+        logging.info(f"Anomaly detected and recorded: {anomaly}")
 
 def main():
     # Initialize the anomaly detection manager
@@ -92,7 +110,7 @@ def main():
         group_id='anomaly_detection_group'
     )
 
-    print("Anomaly Detection Service Started. Listening for telemetry data...")
+    logging.info("Anomaly Detection Service Started. Listening for telemetry data...")
 
     for message in consumer:
         telemetry_data = message.value
