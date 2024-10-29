@@ -38,8 +38,25 @@ def generate_data(simulation_id, is_constellation=False, satellites=1):
             """).format(sql.Identifier(table_name)), (t, sat_id, json.dumps(telemetry_data)))
         conn.commit()
 
+        print('Data generated for timestep', t)
+
     cursor.close()
     conn.close()
 
 if __name__ == "__main__":
-    generate_data(simulation_id=1, is_constellation=True, satellites=3)
+    generate_data(simulation_id=2, is_constellation=True, satellites=3)
+
+    # print the table names
+    conn = psycopg2.connect(
+        host="localhost",
+        database="telemetry_db",
+        user="postgres",
+    )
+    cursor = conn.cursor()
+    cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+
+    for table in cursor.fetchall():
+        print(table)
+
+    cursor.close()
+    conn.close()
