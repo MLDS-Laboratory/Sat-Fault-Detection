@@ -48,9 +48,10 @@ services:
     build: ./anomaly-detection-container
     volumes:
       - ./anomaly-detection-container:/app
-      - ./anomaly-detection/models:/app/models
+      - ./anomaly-detection-container/models:/app/models
     depends_on:
       - kafka
+      - influx_telegraf
     networks:
       - telemetry-network
 
@@ -60,6 +61,7 @@ services:
       - "3000:3000"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - influx_telegraf
     networks:
