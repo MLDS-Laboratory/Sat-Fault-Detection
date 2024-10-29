@@ -1,14 +1,16 @@
 version: '3.8'
 
 services:
-  simulation:
-    build: ./simulation-container
+  sim_middleware:
+    build: ./sim_middleware-container
     volumes:
-      - ./simulation-container/simulations:/basilisk/simulations
+      - ./sim_middleware-container/simulations:/basilisk/simulations
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: telemetry_db
+    depends_on:
+      - kafka
     networks:
       - telemetry-network
 
@@ -31,35 +33,22 @@ services:
     networks:
       - telemetry-network
 
-  middleware:
-    build: ./middleware
-    depends_on:
-      - simulation
-      - kafka
-    networks:
-      - telemetry-network
-
-  influxdb:
-    image: influxdb:1.8
+  influx_telegraf:
+    build: ./influx_telegraf-container
     volumes:
-      - influxdb_data:/var/lib/influxdb
-    networks:
-      - telemetry-network
-
-  telegraf:
-    image: telegraf:1.18
-    volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - influx_telegraf_data:/var/lib/influxdb
+      - ./influx_telegraf-container/influxdb.conf:/etc/influxdb/influxdb.conf
+      - ./influx_telegraf-container/telegraf.conf:/etc/telegraf/telegraf.conf
     depends_on:
       - kafka
-      - influxdb
     networks:
       - telemetry-network
 
   anomaly_detection:
-    build: ./anomaly-detection
+    build: ./anomaly-detection-container
     volumes:
-      - ./anomaly-detection/models:/anomaly_detection
+      - ./anomaly-detection-container:/app
+      - ./anomaly-detection/models:/app/models
     depends_on:
       - kafka
     networks:
@@ -69,14 +58,15 @@ services:
     build: ./grafana
     ports:
       - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
-      - influxdb
+      - influx_telegraf
     networks:
       - telemetry-network
 
 volumes:
-  postgres_data:
-  influxdb_data:
+  influx_telegraf_data:
 
 networks:
   telemetry-network:
