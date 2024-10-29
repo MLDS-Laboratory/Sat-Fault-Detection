@@ -37,7 +37,6 @@ RUN /bin/bash -c "source .venv/bin/activate && /basilisk/.venv/bin/python3 conan
 # Install Python dependencies for PostgreSQL and additional requirements
 RUN /bin/bash -c "source .venv/bin/activate && pip install psycopg2-binary kafka-python"
 
-COPY middleware.py ./
 
 # Modify pg_hba.conf to use trust authentication for all connections
 RUN sed -i "s/peer/trust/g" /etc/postgresql/14/main/pg_hba.conf && \
@@ -49,11 +48,20 @@ RUN service postgresql start && \
     su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='postgres'\" | grep -q 1 || psql -c \"CREATE USER postgres WITH PASSWORD 'postgres';\"" && \
     su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE telemetry_db TO postgres;\""
 
-# Expose PostgreSQL port if needed
-# EXPOSE 5432
+RUN apt-get update && \
+    apt-get install -y supervisor software-properties-common curl gnupg
 
-# Set the working directory to /basilisk
+# Set the working directory
 WORKDIR /basilisk
 
-# Default command to start PostgreSQL and allow interaction
-CMD service postgresql start && /bin/bash
+# Copy middleware script into the container
+COPY middleware.py /basilisk/middleware.py
+
+# Copy supervisord configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose PostgreSQL port
+EXPOSE 5432
+
+# Start supervisord to manage PostgreSQL
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -47,6 +47,9 @@ def stream_data(table_name, kafka_topic='telemetry', satellite_id=None):
     logging.info("Data streaming completed.")
 
 if __name__ == "__main__":
+
+    time.sleep(15)  # Make sure to wait for InfluxDB and Kafka to start
+
     # Simulation Parameters
     table_name = "simulation_1"
     is_constellation = True

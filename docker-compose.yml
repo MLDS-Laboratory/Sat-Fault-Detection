@@ -5,12 +5,14 @@ services:
     build: ./simulation-container
     volumes:
       - ./simulation-container/simulations:/basilisk/simulations
+      - pgdata:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: telemetry_db
     depends_on:
       - kafka
+    restart: always  # Ensures the container restarts on failure
     networks:
       - telemetry-network
 
@@ -23,6 +25,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
     depends_on:
       - zookeeper
+    restart: always
     networks:
       - telemetry-network
 
@@ -30,6 +33,7 @@ services:
     image: bitnami/zookeeper:latest
     environment:
       ALLOW_ANONYMOUS_LOGIN: 'yes'
+    restart: always
     networks:
       - telemetry-network
 
@@ -41,6 +45,7 @@ services:
       - ./influx_telegraf-container/telegraf.conf:/etc/telegraf/telegraf.conf
     depends_on:
       - kafka
+    restart: always
     networks:
       - telemetry-network
 
@@ -53,6 +58,7 @@ services:
     depends_on:
       - kafka
       - influx_telegraf
+    restart: always
     networks:
       - telemetry-network
 
@@ -65,11 +71,13 @@ services:
       - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - influx_telegraf
+    restart: always
     networks:
       - telemetry-network
 
 volumes:
   influx_telegraf_data:
+  pgdata:
 
 networks:
   telemetry-network:
