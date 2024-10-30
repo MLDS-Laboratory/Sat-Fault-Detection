@@ -1,5 +1,5 @@
 {
     "active_models": {
-        "OutlierDetectionModel" : "./models/outlier_detection.py"
+        "OutlierDetectionModel" : "outlier_detection.py"
     }
 }

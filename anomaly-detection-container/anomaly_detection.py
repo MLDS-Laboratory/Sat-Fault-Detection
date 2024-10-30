@@ -66,6 +66,7 @@ class AnomalyDetectionManager:
         Parameters:
             data (dict): The telemetry data.
         """
+        logging.info(f"Processing telemetry data: {data}")
         for model in self.models:
             try:
                 is_anomaly, details = model.detect(data)

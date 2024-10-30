@@ -49,7 +49,7 @@ def stream_data(table_name, kafka_topic='telemetry', satellite_id=None):
 
 if __name__ == "__main__":
 
-    time.sleep(15)  # Make sure to wait for InfluxDB and Kafka to start
+    time.sleep(2)  # Make sure to wait for InfluxDB and Kafka to start
 
     # Simulation Parameters
     table_name = "simulation_1"

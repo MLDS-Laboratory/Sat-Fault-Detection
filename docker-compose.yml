@@ -40,12 +40,10 @@ services:
   influx_telegraf:
     build: ./influx_telegraf-container
     volumes:
-      - influx_telegraf_data:/var/lib/influxdb
       - ./influx_telegraf-container/influxdb.conf:/etc/influxdb/influxdb.conf
       - ./influx_telegraf-container/telegraf.conf:/etc/telegraf/telegraf.conf
     depends_on:
       - kafka
-    restart: always
     networks:
       - telemetry-network
 

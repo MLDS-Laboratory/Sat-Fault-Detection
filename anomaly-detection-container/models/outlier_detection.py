@@ -1,5 +1,4 @@
-import numpy as np
-from anomaly_detection_model import AnomalyDetectionModel
+from models.anomaly_detection_model import AnomalyDetectionModel
 import logging
 
 class OutlierDetectionModel(AnomalyDetectionModel):
