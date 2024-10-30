@@ -1,5 +1,8 @@
 {
-    "active_models": {
-        "OutlierDetectionModel" : "outlier_detection.py"
+    "constellation_models": {
+        "ConstellationOutlierDetection": "./constellation/constellation_outlier_detection.py"
+    },
+    "satellite_models": {
+        "OutlierDetectionModel" : "./satellite/outlier_detection.py"
     }
 }

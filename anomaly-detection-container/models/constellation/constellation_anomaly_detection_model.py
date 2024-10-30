@@ -1,14 +1,15 @@
+
 from abc import ABC, abstractmethod
 
-class AnomalyDetectionModel(ABC):
+class ConstellationAnomalyDetectionModel(ABC):
     """
-    Abstract base class for all anomaly detection models.
+    Abstract base class for constellation-level anomaly detection models.
     """
 
     @abstractmethod
     def detect(self, data):
         """
-        Process incoming data and detect anomalies.
+        Process incoming data and detect anomalies at the constellation level.
 
         Parameters:
             data (dict): A dictionary containing telemetry data.

@@ -1,7 +1,7 @@
-from models.anomaly_detection_model import AnomalyDetectionModel
+from models.satellite.satellite_anomaly_detection_model import SatelliteAnomalyDetectionModel       # imports relative to docker container root
 import logging
 
-class OutlierDetectionModel(AnomalyDetectionModel):
+class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
     """
     Simple outlier detection based on statistical thresholds.
     """
