@@ -18,7 +18,9 @@ CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
 class AnomalyDetectionManager:
     def __init__(self, influx_host='influx_telegraf', influx_port=8086, influx_db='telemetry_db', config_path=CONFIG_FILE):
         self.constellation_models = []
-        self.satellite_models = {}
+        self.satellite_models_classes = {}
+        self.active_satellite_models = {}
+        self.seen_satellite_ids = set()
         self.load_models(config_path)
         self.influx_client = InfluxDBClient(host=influx_host, port=influx_port, database=influx_db)
         self.ensure_anomalies_measurement()
@@ -40,8 +42,8 @@ class AnomalyDetectionManager:
             model_path = os.path.join(MODELS_DIR, model_info['path'])
             parameters = model_info.get('parameters', {})
 
-            self._load_model(
-                model_name, model_path, parameters, ConstellationAnomalyDetectionModel, self.constellation_models
+            self._load_constellation_model(
+                model_name, model_path, parameters
             )
 
         # Load satellite-specific models
@@ -50,16 +52,16 @@ class AnomalyDetectionManager:
             model_path = os.path.join(MODELS_DIR, model_info['path'])
             parameters = model_info.get('parameters', {})
 
-            self._load_model(
-                model_name, model_path, parameters, SatelliteAnomalyDetectionModel, self.satellite_models, is_dict=True
+            self._register_satellite_model(
+                model_name, model_path, parameters
             )
 
-    def _load_model(self, model_name, model_path, parameters, expected_class, model_storage, is_dict=False):
+    def _load_constellation_model(self, model_name, model_path, parameters):
         """
-        Helper function to load a model dynamically with parameters.
+        Helper function to load a constellation-level model dynamically with parameters.
         """
         if not os.path.exists(model_path):
-            logging.warning(f"Model file {model_path} not found. Skipping.")
+            logging.warning(f"Constellation model file {model_path} not found. Skipping.")
             return
 
         spec = importlib.util.spec_from_file_location(model_name, model_path)
@@ -68,19 +70,40 @@ class AnomalyDetectionManager:
 
         # Instantiate the model with parameters as kwargs
         model_class = getattr(module, model_name, None)
-        if model_class and issubclass(model_class, expected_class):
+        if model_class and issubclass(model_class, ConstellationAnomalyDetectionModel):
             try:
                 model_instance = model_class(**parameters)
                 model_instance.load_model()
-                if is_dict:
-                    model_storage[model_name] = model_instance
-                else:
-                    model_storage.append(model_instance)
-                logging.info(f"Loaded model: {model_name} with parameters: {parameters}")
+                self.constellation_models.append(model_instance)
+                logging.info(f"Loaded constellation-level model: {model_name} with parameters: {parameters}")
             except Exception as e:
-                logging.error(f"Error initializing model {model_name}: {e}")
+                logging.error(f"Error initializing constellation model {model_name}: {e}")
         else:
-            logging.warning(f"Model class {model_name} not found or does not inherit from {expected_class.__name__}.")
+            logging.warning(f"Model class {model_name} not found or does not inherit from ConstellationAnomalyDetectionModel.")
+
+    def _register_satellite_model(self, model_name, model_path, parameters):
+        """
+        Register satellite-specific model classes and parameters without instantiating them yet.
+        """
+        if not os.path.exists(model_path):
+            logging.warning(f"Satellite model file {model_path} not found. Skipping.")
+            return
+
+        spec = importlib.util.spec_from_file_location(model_name, model_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        # Get the model class
+        model_class = getattr(module, model_name, None)
+        if model_class and issubclass(model_class, SatelliteAnomalyDetectionModel):
+            # Store the class and parameters for later instantiation
+            self.satellite_models_classes[model_name] = {
+                'class': model_class,
+                'parameters': parameters
+            }
+            logging.info(f"Registered satellite-specific model class: {model_name} with parameters: {parameters}")
+        else:
+            logging.warning(f"Satellite model class {model_name} not found or does not inherit from SatelliteAnomalyDetectionModel.")
 
     def ensure_anomalies_measurement(self):
         """
@@ -95,34 +118,49 @@ class AnomalyDetectionManager:
         Parameters:
             data (dict): A dictionary containing telemetry data.
         """
+        satellite_id = data.get('satellite_id')
+        if satellite_id is None:
+            logging.warning("Data record missing 'satellite_id'. Skipping satellite-specific anomaly detection.")
+        else:
+            # Check if this is a new satellite
+            if satellite_id not in self.seen_satellite_ids:
+                self.seen_satellite_ids.add(satellite_id)
+                self.active_satellite_models[satellite_id] = {}
+                # Instantiate satellite-specific models for this satellite
+                for model_name, model_info in self.satellite_models_classes.items():
+                    model_class = model_info['class']
+                    parameters = model_info['parameters']
+                    try:
+                        model_instance = model_class(**parameters)
+                        model_instance.load_model()
+                        self.active_satellite_models[satellite_id][model_name] = model_instance
+                        logging.info(f"Loaded satellite-specific model: {model_name} for satellite {satellite_id} with parameters: {parameters}")
+                    except Exception as e:
+                        logging.error(f"Error initializing satellite model {model_name} for satellite {satellite_id}: {e}")
+
         # Process constellation-level anomalies
         for model in self.constellation_models:
             try:
                 is_anomaly, details = model.detect(data)
                 if is_anomaly:
-                    self.record_anomaly(details)
+                    # details could be a list of anomalies
+                    if isinstance(details.get('anomalies'), list):
+                        for anomaly_detail in details['anomalies']:
+                            self.record_anomaly(anomaly_detail)
+                    else:
+                        self.record_anomaly(details)
             except Exception as e:
                 logging.error(f"Error in constellation model {model.__class__.__name__}: {e}")
 
         # Process satellite-specific anomalies
-        satellite_data = {}
-        for record in data:
-            sat_id = record.get('satellite_id')
-            if sat_id is None:
-                continue
-            if sat_id not in satellite_data:
-                satellite_data[sat_id] = []
-            satellite_data[sat_id].append(record)
-
-        for sat_id, records in satellite_data.items():
-            for model_name, model in self.satellite_models.items():
-                for record in records:
-                    try:
-                        is_anomaly, details = model.detect(record)
-                        if is_anomaly:
-                            self.record_anomaly(details)
-                    except Exception as e:
-                        logging.error(f"Error in satellite model {model_name} for satellite {sat_id}: {e}")
+        if satellite_id is not None and satellite_id in self.active_satellite_models:
+            for model_name, model in self.active_satellite_models[satellite_id].items():
+                try:
+                    is_anomaly, details = model.detect(data)
+                    if is_anomaly:
+                        self.record_anomaly(details)
+                except Exception as e:
+                    logging.error(f"Error in satellite model {model_name} for satellite {satellite_id}: {e}")
 
     def record_anomaly(self, details):
         """
