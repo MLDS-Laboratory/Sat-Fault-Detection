@@ -24,4 +24,4 @@ ENV INFLUXDB_PORT=8086
 ENV INFLUXDB_DB=telemetry_db
 
 # Command to run the anomaly detection script
-CMD ["python", "anomaly_detection.py"]
+CMD ["python", "anomaly_manager.py"]

@@ -6,7 +6,14 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
     Simple outlier detection based on statistical thresholds.
     """
 
-    def __init__(self, threshold=3):
+    def __init__(self, metric = None, threshold=3):
+        """
+        Parameters:
+            threshold (float): Z-score threshold for outlier detection.
+            metric (str): The data field to use for outlier detection.
+                        If None, the model will check each data field for outliers.
+        """
+
         self.threshold = threshold
         self.load_model()
 

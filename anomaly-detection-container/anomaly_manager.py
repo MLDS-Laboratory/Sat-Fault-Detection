@@ -25,7 +25,7 @@ class AnomalyDetectionManager:
 
     def load_models(self, config_path):
         """
-        Dynamically load all active anomaly detection models from the config file.
+        Dynamically load all active anomaly detection models from the config file with parameters.
         """
         if not os.path.exists(config_path):
             logging.error(f"Configuration file {config_path} not found.")
@@ -36,54 +36,57 @@ class AnomalyDetectionManager:
 
         # Load constellation-level models
         constellation_models = config.get('constellation_models', {})
-        for model_name, model_file in constellation_models.items():
-            model_path = os.path.join(MODELS_DIR, model_file)
-            if not os.path.exists(model_path):
-                logging.warning(f"Model file {model_file} not found in {MODELS_DIR}. Skipping.")
-                continue
+        for model_name, model_info in constellation_models.items():
+            model_path = os.path.join(MODELS_DIR, model_info['path'])
+            parameters = model_info.get('parameters', {})
 
-            spec = importlib.util.spec_from_file_location(model_name, model_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-
-            # Instantiate the model
-            model_class = getattr(module, model_name, None)
-            if model_class and issubclass(model_class, ConstellationAnomalyDetectionModel):
-                model_instance = model_class()
-                model_instance.load_model()
-                self.constellation_models.append(model_instance)
-                logging.info(f"Loaded constellation-level model: {model_name}")
-            else:
-                logging.warning(f"Model class {model_name} not found or does not inherit from ConstellationAnomalyDetectionModel.")
+            self._load_model(
+                model_name, model_path, parameters, ConstellationAnomalyDetectionModel, self.constellation_models
+            )
 
         # Load satellite-specific models
         satellite_models = config.get('satellite_models', {})
-        for model_name, model_file in satellite_models.items():
-            model_path = os.path.join(MODELS_DIR, model_file)
-            if not os.path.exists(model_path):
-                logging.warning(f"Model file {model_file} not found in {MODELS_DIR}. Skipping.")
-                continue
+        for model_name, model_info in satellite_models.items():
+            model_path = os.path.join(MODELS_DIR, model_info['path'])
+            parameters = model_info.get('parameters', {})
 
-            spec = importlib.util.spec_from_file_location(model_name, model_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            self._load_model(
+                model_name, model_path, parameters, SatelliteAnomalyDetectionModel, self.satellite_models, is_dict=True
+            )
 
-            # Instantiate the model
-            model_class = getattr(module, model_name, None)
-            if model_class and issubclass(model_class, SatelliteAnomalyDetectionModel):
-                model_instance = model_class()
+    def _load_model(self, model_name, model_path, parameters, expected_class, model_storage, is_dict=False):
+        """
+        Helper function to load a model dynamically with parameters.
+        """
+        if not os.path.exists(model_path):
+            logging.warning(f"Model file {model_path} not found. Skipping.")
+            return
+
+        spec = importlib.util.spec_from_file_location(model_name, model_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        # Instantiate the model with parameters as kwargs
+        model_class = getattr(module, model_name, None)
+        if model_class and issubclass(model_class, expected_class):
+            try:
+                model_instance = model_class(**parameters)
                 model_instance.load_model()
-                self.satellite_models[model_name] = model_instance
-                logging.info(f"Loaded satellite-specific model: {model_name}")
-            else:
-                logging.warning(f"Model class {model_name} not found or does not inherit from SatelliteAnomalyDetectionModel.")
+                if is_dict:
+                    model_storage[model_name] = model_instance
+                else:
+                    model_storage.append(model_instance)
+                logging.info(f"Loaded model: {model_name} with parameters: {parameters}")
+            except Exception as e:
+                logging.error(f"Error initializing model {model_name}: {e}")
+        else:
+            logging.warning(f"Model class {model_name} not found or does not inherit from {expected_class.__name__}.")
 
     def ensure_anomalies_measurement(self):
         """
         Ensure that the 'anomalies' measurement exists in InfluxDB.
         """
         self.influx_client.switch_database('telemetry_db')
-        # InfluxDB creates measurements on first write, so this might be optional
 
     def process_data(self, data):
         """
@@ -92,7 +95,6 @@ class AnomalyDetectionManager:
         Parameters:
             data (dict): A dictionary containing telemetry data.
         """
-        
         # Process constellation-level anomalies
         for model in self.constellation_models:
             try:
