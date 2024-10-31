@@ -6,6 +6,14 @@ class ConstellationOutlierDetection(ConstellationAnomalyDetectionModel):
     Example constellation-level anomaly detection model using statistical outliers.
     """
 
+    def __init__(self, std_threshold=2):
+        """
+        Parameters:
+            std_threshold (float): The threshold for detecting outliers based on standard deviation.
+        """
+        self.std_threshold = std_threshold
+        self.load_model()
+
     def load_model(self):
         """
         Initialize any required parameters or load pre-trained models.
@@ -27,7 +35,7 @@ class ConstellationOutlierDetection(ConstellationAnomalyDetectionModel):
         anomalies = []
         for sat in data:
             velocity = sat['data'].get('velocity')
-            if velocity is not None and abs(velocity - mean_velocity) > 2 * std_velocity:
+            if velocity is not None and abs(velocity - mean_velocity) > self.std_threshold * std_velocity:
                 anomalies.append({
                     'satellite_id': sat['satellite_id'],
                     'metric': 'velocity',

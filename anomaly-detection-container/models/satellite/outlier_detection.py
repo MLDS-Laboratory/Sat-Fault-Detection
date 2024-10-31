@@ -15,6 +15,7 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         """
 
         self.threshold = threshold
+        self.metric = metric
         self.load_model()
 
     def load_model(self):
@@ -24,23 +25,43 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         pass
 
     def detect(self, data):
-        velocity = data.get('velocity', None)
-        if velocity is None:
+        """
+        Detect outliers in the incoming data.
+
+        Parameters:
+            data (dict): A dictionary containing telemetry data.
+
+        Returns:
+            bool: True if an anomaly is detected, False otherwise.
+            dict: Details of the anomaly if detected.
+        """
+        if self.metric is not None:
+            return self.detect_field(self.metric, data)
+        else:
+            for field in data:
+                is_anomaly, details = self.detect_field(field, data)
+                if is_anomaly:
+                    return is_anomaly, details
+        return False, {}
+
+    def detect_field(self, field, data):
+        field = data.get(field, None)
+        if field is None:
             return False, {}
         
-        logging.info(f'Velocity: {velocity}')
+        logging.info(f'Velocity: {field}')
         
         # Simple z-score based outlier detection
         mean = 5
         std = 1.5
-        z_score = (velocity - mean) / std
+        z_score = (field - mean) / std
 
         if abs(z_score) > self.threshold:
             anomaly_details = {
-                'metric': 'velocity',
-                'value': velocity,
+                'metric': 'field',
+                'value': field,
                 'z_score': z_score,
-                'anomaly_type': 'high_velocity',
+                'anomaly_type': 'high_field',
                 'message': f'Velocity outlier detected with z-score {z_score:.2f}'
             }
             return True, anomaly_details
