@@ -44,7 +44,7 @@ def generate_data(simulation_id, is_constellation=False, satellites=1):
     conn.close()
 
 if __name__ == "__main__":
-    generate_data(simulation_id=1, is_constellation=True, satellites=3)
+    generate_data(simulation_id=2, is_constellation=True, satellites=3)
 
     # print the table names
     conn = psycopg2.connect(

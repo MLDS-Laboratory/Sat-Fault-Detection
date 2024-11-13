@@ -6,7 +6,7 @@ import logging
 from kafka import KafkaConsumer
 from influxdb import InfluxDBClient
 from models.constellation.constellation_anomaly_detection_model import ConstellationAnomalyDetectionModel
-from models.satellite.satellite_anomaly_detection_model import SatelliteAnomalyDetectionModel
+from models.satellite.satellite_anomaly_detection_model import SatelliteAnomalyDetectionModel, AnomalyDetails
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
@@ -118,7 +118,7 @@ class AnomalyDetectionManager:
         Parameters:
             data (dict): A dictionary containing telemetry data.
         """
-        satellite_id = data.get('satellite_id')
+        satellite_id = int(data.get('satellite_id'))
         if satellite_id is None:
             logging.warning("Data record missing 'satellite_id'. Skipping satellite-specific anomaly detection.")
         else:
@@ -130,6 +130,8 @@ class AnomalyDetectionManager:
                 for model_name, model_info in self.satellite_models_classes.items():
                     model_class = model_info['class']
                     parameters = model_info['parameters']
+                    # Add the satellite_id to the parameters
+                    parameters['satellite_id'] = satellite_id
                     try:
                         model_instance = model_class(**parameters)
                         model_instance.load_model()
@@ -156,6 +158,8 @@ class AnomalyDetectionManager:
         if satellite_id is not None and satellite_id in self.active_satellite_models:
             for model_name, model in self.active_satellite_models[satellite_id].items():
                 try:
+                    logging.info(f"Processing satellite-specific anomalies for satellite {satellite_id} with model {model_name}")
+                    logging.info(f"Data: {data}")
                     is_anomaly, details = model.detect(data)
                     if is_anomaly:
                         self.record_anomaly(details)

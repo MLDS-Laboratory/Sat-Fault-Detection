@@ -12,7 +12,13 @@ class ConstellationAnomalyDetectionModel(ABC):
         Process incoming data and detect anomalies at the constellation level.
 
         Parameters:
-            data (dict): A dictionary containing telemetry data.
+            data (dict): A dictionary containing telemetry data. Data format:
+            {
+                'time': number,
+                'satellite_id': number,
+                'data': dict
+            }
+            Since data comes in one satellite at a time, this class will need to track the satellites together.
 
         Returns:
             bool: True if anomaly is detected, False otherwise.

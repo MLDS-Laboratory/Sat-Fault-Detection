@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the anomaly detection script and models
-COPY anomaly_detection.py ./
+COPY anomaly_manager.py ./
 COPY models ./models
 COPY config.json ./
 

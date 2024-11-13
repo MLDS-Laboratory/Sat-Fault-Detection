@@ -1,11 +1,5 @@
 {
     "constellation_models": {
-        "ConstellationOutlierDetection": {
-            "path": "./constellation/constellation_outlier_detection.py",
-            "parameters": {
-                "std_threshold": 2
-            }
-        }
     },
     "satellite_models": {
         "OutlierDetectionModel": {

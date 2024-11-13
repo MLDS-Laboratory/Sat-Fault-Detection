@@ -1,12 +1,32 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+# Details class for an anomaly detection model to return
+@dataclass
+class AnomalyDetails:
+    satellite_id: int
+    anomaly_model: str
+    time: str
+    metric: str
+    value: float
+    message: str
 
 class SatelliteAnomalyDetectionModel(ABC):
     """
     Abstract base class for satellite-specific anomaly detection models.
     """
+    def __init__(self, **kwargs):
+        """
+        Initialize the satellite-specific anomaly detection model. 
+
+        Parameters:
+            satellite_id (int): The ID of the satellite.
+        """
+        self.satellite_id = kwargs.get('satellite_id')
+        self.load_model()
 
     @abstractmethod
-    def detect(self, data):
+    def detect(self, data) -> AnomalyDetails:
         """
         Process incoming data for a specific satellite and detect anomalies.
 
@@ -14,8 +34,7 @@ class SatelliteAnomalyDetectionModel(ABC):
             data (dict): A dictionary containing telemetry data for a single satellite.
 
         Returns:
-            bool: True if anomaly is detected, False otherwise.
-            dict: Details of the anomaly if detected.
+            AnomalyDetails: Details of the anomaly if detected. Otherwise, return None.
         """
         pass
 

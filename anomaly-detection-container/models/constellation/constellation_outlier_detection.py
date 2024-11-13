@@ -1,4 +1,4 @@
-from constellation_anomaly_detection_model import ConstellationAnomalyDetectionModel
+from models.constellation.constellation_anomaly_detection_model import ConstellationAnomalyDetectionModel
 import numpy as np
 
 class ConstellationOutlierDetection(ConstellationAnomalyDetectionModel):
@@ -24,7 +24,20 @@ class ConstellationOutlierDetection(ConstellationAnomalyDetectionModel):
     def detect(self, data):
         """
         Detect anomalies based on the average velocity of the constellation.
+
+        data (dict): A dictionary containing telemetry data for all satellites. Data format:
+            {
+                'time': number,
+                'satellite_id': number,
+                'data': dict
+            }
+            Since data comes in one satellite at a time, this will need to track the satellites together
         """
+
+        # if not a list, make it one
+        if not isinstance(data, list):
+            data = [data]
+
         velocities = [sat['data']['velocity'] for sat in data if 'velocity' in sat['data']]
         if not velocities:
             return False, {}
