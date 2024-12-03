@@ -52,7 +52,7 @@ if __name__ == "__main__":
     time.sleep(2)  # Make sure to wait for InfluxDB and Kafka to start
 
     # Simulation Parameters
-    table_name = "simulation_2"
+    table_name = "simulation_3"
     is_constellation = True
     satellites = 3
 

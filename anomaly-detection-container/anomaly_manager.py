@@ -3,6 +3,7 @@ import sys
 import json
 import importlib.util
 import logging
+import traceback
 from kafka import KafkaConsumer
 from influxdb import InfluxDBClient
 from models.constellation.constellation_anomaly_detection_model import ConstellationAnomalyDetectionModel
@@ -152,7 +153,7 @@ class AnomalyDetectionManager:
                     else:
                         self.record_anomaly(details)
             except Exception as e:
-                logging.error(f"Error in constellation model {model.__class__.__name__}: {e}")
+                logging.error(f"Error in constellation model {model.__class__.__name__}: {e} - {traceback.format_exc()}")
 
         # Process satellite-specific anomalies
         if satellite_id is not None and satellite_id in self.active_satellite_models:
@@ -176,14 +177,14 @@ class AnomalyDetectionManager:
         anomaly = {
             "measurement": "anomalies",
             "tags": {
-                "satellite_id": str(details.get('satellite_id', 'unknown')),
-                "anomaly_model": details.get('anomaly_model', 'unknown')
+                "satellite_id": str(details.satellite_id),
+                "anomaly_model": details.anomaly_model
             },
-            "time": details.get('time'),
+            "time": details.time,
             "fields": {
-                "metric": details.get('metric', 'unknown'),
-                "anomalous_value": details.get('value', 0),
-                "message": details.get('message', '')
+                "metric": details.metric,
+                "anomalous_value": details.value,
+                "message": details.message
             }
         }
         self.influx_client.write_points([anomaly])

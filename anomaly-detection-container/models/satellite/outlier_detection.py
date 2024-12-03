@@ -17,6 +17,9 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         self.threshold = threshold
         self.metric = metric
         self.load_model()
+        self.means = {}
+        self.variances = {}
+        self.counts = {}
 
     def load_model(self):
         """
@@ -42,13 +45,17 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         """
         logging.info(f'Outlier detection model reports: {self.metric} - {self.threshold}')
         if self.metric is not None:
-            return self.detect_field(data['time'], self.metric, data['data'])
+            data = self.detect_field(data['time'], self.metric, data['data'])
+            if data is not None:
+                return True, data
+            else:
+                return False, None
         else:
             for field in data:
-                is_anomaly, details = self.detect_field(data['time'], field, data['data'])
-                if is_anomaly:
-                    return details
-        return None
+                anomaly_data = self.detect_field(data['time'], field, data['data'])
+                if anomaly_data is not None:
+                    return True, anomaly_data
+        return False, None
 
     def detect_field(self, time, field, data):
         """
@@ -57,6 +64,9 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         Parameters:
             field (str): The field to check for outliers.
             data (dict): A dictionary containing the payload. This is the 'data' field in the whole telemetry packet.
+
+        Returns:
+            AnomalyDetails: Details of the anomaly if detected. Otherwise, return None
         """
         field_name = field
         field = data.get(field, None)
@@ -64,15 +74,26 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         if field is None:
             return None
         
-        
+        # keep running mean and std for the field
+        if field_name not in self.means:
+            self.means[field_name] = 0
+            self.variances[field_name] = 0
+            self.counts[field_name] = 0
+
+        self.means[field_name] = (self.means[field_name] * self.counts[field_name] + field) / (self.counts[field_name] + 1)
+        # Welford's online algorithm for variance
+        self.variances[field_name] = (self.variances[field_name] * (self.counts[field_name]) + (field - self.means[field_name]) ** 2) / (self.counts[field_name] + 1)  
+        self.counts[field_name] += 1
+
+        mean = self.means[field_name]
+        std = self.variances[field_name] ** 0.5
+
         # Simple z-score based outlier detection
-        mean = 5
-        std = 1.5
         z_score = (field - mean) / std
 
         if abs(z_score) > self.threshold:
             anomaly_details = AnomalyDetails(
-                    satellite_id=self.satellite_id, anomaly_model=self.__class__.__name__, time=data['time'],
+                    satellite_id=self.satellite_id, anomaly_model=self.__class__.__name__, time=time,
                     metric=field_name, value=field, 
                     message=f'Velocity outlier detected with z-score {z_score:.2f}'
                 )
