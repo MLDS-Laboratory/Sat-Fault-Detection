@@ -6,7 +6,7 @@ from dataclasses import dataclass
 class AnomalyDetails:
     satellite_id: int
     anomaly_model: str
-    time: str
+    time: int
     metric: str
     value: float
     message: str

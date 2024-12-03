@@ -5,7 +5,7 @@
         "OutlierDetectionModel": {
             "path": "./satellite/outlier_detection.py",
             "parameters": {
-                "threshold": 3,
+                "threshold": 1.5,
                 "metric": "velocity"
             }
         }

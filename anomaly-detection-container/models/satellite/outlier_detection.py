@@ -70,7 +70,7 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         """
         field_name = field
         field = data.get(field, None)
-        logging.info(f'Velocity: {field}')
+        logging.info(f'Velocity: {field} - {self.means} - {self.variances} - {self.counts}')
         if field is None:
             return None
         

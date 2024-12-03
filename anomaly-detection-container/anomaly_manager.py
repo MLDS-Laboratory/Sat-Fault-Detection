@@ -187,7 +187,7 @@ class AnomalyDetectionManager:
                 "message": details.message
             }
         }
-        self.influx_client.write_points([anomaly])
+        self.influx_client.write_points([anomaly], time_precision='s')
         logging.info(f"Anomaly detected and recorded: {anomaly}")
 
 def main():
