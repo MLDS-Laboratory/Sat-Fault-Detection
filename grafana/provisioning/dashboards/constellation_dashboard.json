@@ -21,22 +21,22 @@
           "enable": true,
           "filter": {
             "exclude": false,
-            "ids": [
-              1
-            ]
+            "ids": []
           },
           "hide": false,
-          "iconColor": "red",
+          "iconColor": "rgba(255, 96, 96, 1)",
           "name": "Anomaly Annotations",
           "target": {
-            "fromAnnotations": true,
-            "query": "SELECT * FROM anomalies WHERE \"satellite_id\"='$satellite_id' AND \"is_sat\"='True'",
+            "fromAnnotations": false,
+            "query": "SELECT \"message\" FROM \"anomalies\" WHERE \"is_sat\"='False' AND \"metric\"='$field' AND \"satellite_id\" =~ /^$satellite_id$/",
             "rawQuery": true,
             "refId": "Anno",
             "tagsColumn": "metric",
             "textColumn": "message",
             "textEditor": true
-          }
+          },
+          "type": "query",
+          "showIn": 1
         }
       ]
     },
@@ -108,7 +108,7 @@
           "x": 0,
           "y": 0
         },
-        "id": 1,
+        "id": 2,
         "maxPerRow": 1,
         "options": {
           "legend": {
@@ -123,7 +123,7 @@
           }
         },
         "pluginVersion": "11.3.0",
-        "repeat": "field",
+        "repeat": "satellite_id",
         "repeatDirection": "v",
         "targets": [
           {
@@ -139,7 +139,7 @@
             "resultFormat": "time_series"
           }
         ],
-        "title": "$field vs Time",
+        "title": "$field vs Time for Satellite $satellite_id",
         "type": "timeseries"
       }
     ],
@@ -149,38 +149,42 @@
     "templating": {
       "list": [
         {
-          "current": {
-            "text": "1",
-            "value": "1"
-          },
+          "name": "field",
+          "label": "Field",
+          "type": "query",
           "datasource": "InfluxDB",
-          "definition": "",
+          "query": "SHOW FIELD KEYS FROM \"telemetry_data\"",
+          "regex": "^data_(.*)$",
           "includeAll": false,
-          "label": "Satellite ID",
-          "name": "satellite_id",
+          "multi": false,
+          "current": {
+            "text": "Select a Field",
+            "value": ""
+          },
           "options": [],
-          "query": "SHOW TAG VALUES WITH KEY = \"satellite_id\"",
           "refresh": 1,
-          "regex": "",
           "sort": 1,
-          "type": "query"
+          "definition": "",
+          "hide": 0
         },
         {
+          "name": "satellite_id",
+          "label": "Satellite ID",
+          "type": "query",
+          "datasource": "InfluxDB",
+          "query": "SHOW TAG VALUES WITH KEY = \"satellite_id\"",
+          "regex": "",
+          "includeAll": true,
+          "multi": true,
           "current": {
-            "text": "All",
+            "text": "Select Satellites",
             "value": []
           },
-          "datasource": "InfluxDB",
-          "definition": "",
-          "includeAll": true,
-          "label": "Field",
-          "multi": true,
-          "name": "field",
           "options": [],
-          "query": "SHOW FIELD KEYS FROM \"telemetry_data\"",
-          "regex": "/^data_(.*)/",
+          "refresh": 1,
           "sort": 2,
-          "type": "query"
+          "definition": "",
+          "hide": 0
         }
       ]
     },
@@ -190,8 +194,9 @@
     },
     "timepicker": {},
     "timezone": "",
-    "title": "Satellite Dashboard",
-    "uid": "satellite-dashboard",
-    "version": 14,
+    "title": "Constellation Dashboard",
+    "uid": "constellation-dashboard",
+    "version": 16,
     "weekStart": ""
   }
+  

@@ -163,22 +163,24 @@ class AnomalyDetectionManager:
                     logging.info(f"Data: {data}")
                     is_anomaly, details = model.detect(data)
                     if is_anomaly:
-                        self.record_anomaly(details)
+                        self.record_anomaly(details, True)
                 except Exception as e:
                     logging.error(f"Error in satellite model {model_name} for satellite {satellite_id}: {e}")
 
-    def record_anomaly(self, details):
+    def record_anomaly(self, details, is_sat):
         """
         Record the anomaly in InfluxDB.
 
         Parameters:
             details (dict): Details about the detected anomaly.
+            is_sat (bool): True if the anomaly is satellite-specific, False if constellation-level.
         """
         anomaly = {
             "measurement": "anomalies",
             "tags": {
                 "satellite_id": str(details.satellite_id),
-                "anomaly_model": details.anomaly_model
+                "anomaly_model": details.anomaly_model,
+                "is_sat": is_sat
             },
             "time": details.time,
             "fields": {
