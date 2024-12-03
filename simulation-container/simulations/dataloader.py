@@ -16,71 +16,50 @@ def generate_data(simulation_id):
     table_name = f"simulation_{simulation_id}"
     cursor.execute(sql.SQL("""
         CREATE TABLE IF NOT EXISTS {} (
-            time BIGINT PRIMARY KEY,
-            x_pos DOUBLE PRECISION,
-            y_pos DOUBLE PRECISION, 
-            z_pos DOUBLE PRECISION,
-            x_velo DOUBLE PRECISION,
-            y_velo DOUBLE PRECISION
-            z_velo DOUBLE PRECISION,
-            x_sigma DOUBLE PRECISION, 
-            y_sigma DOUBLE PRECISION, 
-            z_sigma DOUBLE PRECISION,
-            x_omega DOUBLE PRECISION,
-            y_omega DOUBLE PRECISION,
-            z_omega DOUBLE PRECISION,
-            CSS_1 DOUBLE PRECISION,
-            CSS_2 DOUBLE PRECISION,
-            CSS_3 DOUBLE PRECISION,
-            CSS_4 DOUBLE PRECISION,
-            CSS_5 DOUBLE PRECISION,
-            CSS_6 DOUBLE PRECISION,
-            x_torque DOUBLE PRECISION,
-            y_torque DOUBLE PRECISION,
-            z_torque DOUBLE PRECISION,
-            sun_x_sensed DOUBLE PRECISION,
-            sun_y_sensed DOUBLE PRECISION,
-            sun_z_sensed DOUBLE PRECISION,
-            sun_x_true DOUBLE PRECISION,
-            sun_y_true DOUBLE PRECISION,
-            sun_z_true DOUBLE PRECISION
+            time INTEGER,
+            satellite_id INTEGER,
+            data JSONB,
+            PRIMARY KEY (time, satellite_id)
         );
     """).format(sql.Identifier(table_name)))
     conn.commit()
 
     for i in range(len(times)):
+
+        data_payload = {
+            "x_pos": pos[i, 0],
+            "y_pos": pos[i, 1],
+            "z_pos": pos[i, 2],
+            "x_velo": velo[i, 0],
+            "y_velo": velo[i, 1],
+            "z_velo": velo[i, 2],
+            "x_sigma": sigma[i, 0],
+            "y_sigma": sigma[i, 1],
+            "z_sigma": sigma[i, 2],
+            "x_omega": omega[i, 1],
+            "y_omega": omega[i, 2],
+            "z_omega": omega[i, 3],
+            "CSS_1": CSSdata[0, i],
+            "CSS_2": CSSdata[1, i],
+            "CSS_3": CSSdata[2, i],
+            "CSS_4": CSSdata[3, i],
+            "CSS_5": CSSdata[4, i],
+            "CSS_6": CSSdata[5, i],
+            "x_torque": disturbances[i, 0],
+            "y_torque": disturbances[i, 1],
+            "z_torque": disturbances[i, 2],
+            "sun_x_sensed": sensedSun[i, 0],
+            "sun_y_sensed": sensedSun[i, 1],
+            "sun_z_sensed": sensedSun[i, 2],
+            "sun_x_true": sunPoint[i, 0],
+            "sun_y_true": sunPoint[i, 1],
+            "sun_z_true": sunPoint[i, 2]
+        }
+
         cursor.execute(sql.SQL("""
-                INSERT INTO {} (time, x_pos, 
-                               y_pos, z_pos, 
-                               x_velo, y_velo, 
-                               z_velo, x_sigma, 
-                               y_sigma, z_sigma, 
-                               x_omega, y_omega, 
-                               z_omega, CSS_1, 
-                               CSS_2, CSS_3, 
-                               CSS_4, CSS_5, 
-                               CSS_6, x_torque, 
-                               y_torque, z_torque, 
-                               sun_x_sensed, sun_y_sensed, 
-                               sun_z_sensed, sun_x_true, 
-                               sun_y_true, sun_z_true)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 
-                               %s, %s, %s, %s, %s, %s, %s, %s, 
-                               %s, %s, %s, %s, %s, %s, %s, %s, 
-                               %s, %s, %s, %s)
-                               """)).format(sql.Identifier(table_name)), \
-                                (times[i], pos[i, 0], pos[i, 1], pos[i, 2], \
-                                 velo[i, 0], velo[i, 1], velo[i, 2], velo[i, 3], \
-                                    sigma[i, 0], sigma[i, 1], sigma[i, 2], \
-                                        sigma[i, 3], omega[i, 1], omega[i, 2], \
-                                            omega[i, 3], CSSdata[0, i], CSSdata[1, i], \
-                                                CSSdata[2, i], CSSdata[3, i], \
-                                                    CSSdata[4, i], CSSdata[5, i], \
-                                                        disturbances[i, 0], disturbances[i, 1], \
-                                                            disturbances[i, 2], sensedSun[i, 0], \
-                                                                sensedSun [i, 1], sensedSun[i, 2], \
-                                                                    sunPoint[i, 0], sunPoint[i, 1], \
-                                                                        sunPoint[i, 2])
+                INSERT INTO {} (time, satellite_id, data)
+                VALUES (%s, %s, %s);
+            """).format(sql.Identifier(table_name)), (i, 1, json.dumps(data_payload)))
         conn.commit()
 
     cursor.close()
