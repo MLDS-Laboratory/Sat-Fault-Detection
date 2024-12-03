@@ -65,10 +65,9 @@
                 "thresholds": {
                     "mode": "absolute",
                     "steps": [{
-                            "color": "red",
-                            "value": null
-                        }
-                    ]
+                        "color": "red",
+                        "value": null
+                    }]
                 }
             },
             "overrides": []
@@ -100,7 +99,7 @@
                 "uid": "P951FEA4DE68E13C5"
             },
             "measurement": "telemetry_data",
-            "query": "SELECT \"$field\" FROM \"telemetry_data\" WHERE \"satellite_id\"='$satellite_id'",
+            "query": "SELECT \"data_$field\" FROM \"telemetry_data\" WHERE \"satellite_id\"='$satellite_id'",
             "rawQuery": true,
             "refId": "A",
             "resultFormat": "time_series"
@@ -109,7 +108,24 @@
         "type": "timeseries",
         "repeat": "field",
         "repeatDirection": "v",
-        "maxPerRow": 1
+        "maxPerRow": 1,
+        "annotations": {
+            "list": [{
+                "datasource": {
+                    "type": "influxdb",
+                    "uid": "P951FEA4DE68E13C5"
+                },
+                "enable": true,
+                "iconColor": "rgba(255, 96, 96, 1)",
+                "name": "Anomalies",
+                "query": "SELECT \"$message\" FROM \"anomalies\" WHERE \"satellite_id\"='$satellite_id' AND \"metric\"='$field'",
+                "rawQuery": true,
+                "type": "query",
+                "showIn": 0,
+                "titleFormat": "$message",
+                "textFormat": "$message"
+            }]
+        }
     }],
     "preload": false,
     "schemaVersion": 40,
@@ -138,15 +154,14 @@
                 "type": "query",
                 "datasource": "InfluxDB",
                 "query": "SHOW FIELD KEYS FROM \"telemetry_data\"",
-                "refresh": 1,
+                "regex": "/^data_(.*)/",
                 "includeAll": true,
-                "current": {
-                    "text": "All Fields",
-                    "value": "$__all"
-                },
                 "multi": true,
+                "current": {
+                    "text": "All",
+                    "value": []
+                },
                 "options": [],
-                "regex": "",
                 "sort": 2,
                 "definition": "",
                 "hide": 0
@@ -161,6 +176,6 @@
     "timezone": "",
     "title": "Telemetry Dashboard",
     "uid": "telemetry-dashboard",
-    "version": 2,
+    "version": 3,
     "weekStart": ""
 }
