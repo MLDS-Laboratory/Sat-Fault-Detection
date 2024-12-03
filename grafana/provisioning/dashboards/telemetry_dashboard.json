@@ -1,181 +1,197 @@
 {
     "annotations": {
-        "list": [{
-            "builtIn": 1,
-            "datasource": {
-                "type": "grafana",
-                "uid": "-- Grafana --"
-            },
-            "enable": true,
-            "hide": true,
-            "iconColor": "rgba(0, 211, 255, 1)",
-            "name": "Annotations & Alerts",
-            "type": "dashboard"
-        }]
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P951FEA4DE68E13C5"
+          },
+          "enable": true,
+          "filter": {
+            "exclude": false,
+            "ids": [
+              1
+            ]
+          },
+          "hide": false,
+          "iconColor": "red",
+          "name": "Anomaly Annotations",
+          "target": {
+            "fromAnnotations": true,
+            "query": "SELECT * FROM anomalies WHERE \"satellite_id\"='$satellite_id'",
+            "rawQuery": true,
+            "refId": "Anno",
+            "tagsColumn": "metric",
+            "textColumn": "message",
+            "textEditor": true
+          }
+        }
+      ]
     },
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 0,
-    "id": 3,
+    "id": 1,
     "links": [],
-    "panels": [{
+    "panels": [
+      {
         "datasource": {
-            "type": "influxdb",
-            "uid": "P951FEA4DE68E13C5"
+          "type": "influxdb",
+          "uid": "P951FEA4DE68E13C5"
         },
         "fieldConfig": {
-            "defaults": {
-                "color": {
-                    "mode": "palette-classic"
-                },
-                "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 0,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                        "legend": false,
-                        "tooltip": false,
-                        "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "smooth",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                        "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "spanNulls": false,
-                    "stacking": {
-                        "group": "A",
-                        "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                        "mode": "off"
-                    }
-                },
-                "mappings": [],
-                "thresholds": {
-                    "mode": "absolute",
-                    "steps": [{
-                        "color": "red",
-                        "value": null
-                    }]
-                }
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
             },
-            "overrides": []
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": []
         },
         "gridPos": {
-            "h": 8,
-            "w": 24,
-            "x": 0,
-            "y": 0
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
         },
         "id": 1,
+        "maxPerRow": 1,
         "options": {
-            "legend": {
-                "calcs": [],
-                "displayMode": "list",
-                "placement": "bottom",
-                "showLegend": true
-            },
-            "tooltip": {
-                "mode": "single",
-                "sort": "none"
-            }
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
         },
         "pluginVersion": "11.3.0",
-        "targets": [{
+        "repeat": "field",
+        "repeatDirection": "v",
+        "targets": [
+          {
             "alias": "$field",
             "datasource": {
-                "type": "influxdb",
-                "uid": "P951FEA4DE68E13C5"
+              "type": "influxdb",
+              "uid": "P951FEA4DE68E13C5"
             },
             "measurement": "telemetry_data",
             "query": "SELECT \"data_$field\" FROM \"telemetry_data\" WHERE \"satellite_id\"='$satellite_id'",
             "rawQuery": true,
             "refId": "A",
             "resultFormat": "time_series"
-        }],
+          }
+        ],
         "title": "$field vs Time",
-        "type": "timeseries",
-        "repeat": "field",
-        "repeatDirection": "v",
-        "maxPerRow": 1,
-        "annotations": {
-            "list": [{
-                "datasource": {
-                    "type": "influxdb",
-                    "uid": "P951FEA4DE68E13C5"
-                },
-                "enable": true,
-                "iconColor": "rgba(255, 96, 96, 1)",
-                "name": "Anomalies",
-                "query": "SELECT \"$message\" FROM \"anomalies\" WHERE \"satellite_id\"='$satellite_id' AND \"metric\"='$field'",
-                "rawQuery": true,
-                "type": "query",
-                "showIn": 0,
-                "titleFormat": "$message",
-                "textFormat": "$message"
-            }]
-        }
-    }],
+        "type": "timeseries"
+      }
+    ],
     "preload": false,
     "schemaVersion": 40,
     "tags": [],
     "templating": {
-        "list": [{
-                "current": {
-                    "text": "1",
-                    "value": "1"
-                },
-                "datasource": "InfluxDB",
-                "definition": "",
-                "includeAll": false,
-                "label": "Satellite ID",
-                "name": "satellite_id",
-                "options": [],
-                "query": "SHOW TAG VALUES WITH KEY = \"satellite_id\"",
-                "refresh": 1,
-                "regex": "",
-                "sort": 1,
-                "type": "query"
-            },
-            {
-                "name": "field",
-                "label": "Field",
-                "type": "query",
-                "datasource": "InfluxDB",
-                "query": "SHOW FIELD KEYS FROM \"telemetry_data\"",
-                "regex": "/^data_(.*)/",
-                "includeAll": true,
-                "multi": true,
-                "current": {
-                    "text": "All",
-                    "value": []
-                },
-                "options": [],
-                "sort": 2,
-                "definition": "",
-                "hide": 0
-            }
-        ]
+      "list": [
+        {
+          "current": {
+            "text": "1",
+            "value": "1"
+          },
+          "datasource": "InfluxDB",
+          "definition": "",
+          "includeAll": false,
+          "label": "Satellite ID",
+          "name": "satellite_id",
+          "options": [],
+          "query": "SHOW TAG VALUES WITH KEY = \"satellite_id\"",
+          "refresh": 1,
+          "regex": "",
+          "sort": 1,
+          "type": "query"
+        },
+        {
+          "current": {
+            "text": "All",
+            "value": []
+          },
+          "datasource": "InfluxDB",
+          "definition": "",
+          "includeAll": true,
+          "label": "Field",
+          "multi": true,
+          "name": "field",
+          "options": [],
+          "query": "SHOW FIELD KEYS FROM \"telemetry_data\"",
+          "regex": "/^data_(.*)/",
+          "sort": 2,
+          "type": "query"
+        }
+      ]
     },
     "time": {
-        "from": "now-6h",
-        "to": "now"
+      "from": "now-6h",
+      "to": "now"
     },
     "timepicker": {},
     "timezone": "",
     "title": "Telemetry Dashboard",
     "uid": "telemetry-dashboard",
-    "version": 3,
+    "version": 14,
     "weekStart": ""
-}
+  }
