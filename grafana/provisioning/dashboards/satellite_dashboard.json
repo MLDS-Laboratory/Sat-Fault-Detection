@@ -190,8 +190,8 @@
     },
     "timepicker": {},
     "timezone": "",
-    "title": "Telemetry Dashboard",
-    "uid": "telemetry-dashboard",
+    "title": "Satellite Dashboard",
+    "uid": "satellite-dashboard",
     "version": 14,
     "weekStart": ""
   }
