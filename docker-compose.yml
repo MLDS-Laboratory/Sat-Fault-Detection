@@ -5,6 +5,7 @@ services:
     build: ./simulation-container
     volumes:
       - ./simulation-container/simulations:/basilisk/simulations
+      - ./simulation-container/middleware.py:/basilisk/middleware.py
       - pgdata:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: postgres

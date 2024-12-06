@@ -20,6 +20,7 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         self.means = {}
         self.variances = {}
         self.counts = {}
+        self.anomaly_start = {}
 
     def load_model(self):
         """
@@ -70,7 +71,7 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         """
         field_name = field
         field = data.get(field, None)
-        logging.info(f'Velocity: {field} - {self.means} - {self.variances} - {self.counts}')
+        logging.info(f'YEEEEEEEEEEEEEEE: {field} - {self.means} - {self.variances} - {self.counts}')
         if field is None:
             return None
         
@@ -91,12 +92,25 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
         # Simple z-score based outlier detection
         z_score = (field - mean) / std
 
+        # if it is an anomaly
         if abs(z_score) > self.threshold:
+
+            # check if anomaly already started
+            if self.anomaly_start[field_name] is None:
+                self.anomaly_start[field_name] = time
+                ending_time = time
+            else:
+                ending_time = time
+                time = self.anomaly_start[field_name]
+                
+
             anomaly_details = AnomalyDetails(
                     satellite_id=self.satellite_id, anomaly_model=self.__class__.__name__, time=time,
-                    metric=field_name, value=field, 
-                    message=f'Velocity outlier detected with z-score {z_score:.2f}'
+                    metric=field_name, value=field, time_end=ending_time,
+                    message=f'{field_name} outlier detected with z-score {z_score:.2f}'
                 )
             
             return anomaly_details
+        else:
+            self.anomaly_start[field_name] = None       # reset the anomaly start time
         return None

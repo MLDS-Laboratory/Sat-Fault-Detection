@@ -7,6 +7,7 @@ class AnomalyDetails:
     satellite_id: int
     anomaly_model: str
     time: int
+    time_end: int
     metric: str
     value: float
     message: str

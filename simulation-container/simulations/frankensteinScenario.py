@@ -245,7 +245,7 @@ def run(vfault, afault, sfault, plot):
     velRef = satellite.dynManager.getStateObject(satellite.hub.nameOfHubVelocity)
 
     #faults will start at this point
-    faultTime = macros.sec2nano(0.25 * period)
+    faultTime = macros.sec2nano(0.2 * period)
 
     #for plotting purposes
     sensedSun = []
@@ -445,7 +445,6 @@ def run(vfault, afault, sfault, plot):
         plt.tight_layout()
         plt.show()
 
-        
     return satLog.times(), pos, velo, sigma, omega, CSSdata, disturbances, sensedSun, sunPoint
 
 if __name__ == "__main__":

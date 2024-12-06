@@ -11,7 +11,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 # Middleware Function
-def stream_data(table_name, kafka_topic='telemetry', satellite_id=None):
+def stream_data(table_name, kafka_topic='telemetry', satellite_id=None, speed = 1):
     conn = psycopg2.connect(
         host="localhost",
         database="telemetry_db",
@@ -43,7 +43,7 @@ def stream_data(table_name, kafka_topic='telemetry', satellite_id=None):
         if i < len(rows) - 1:
             next_time = rows[i + 1][0]
             current_time = row[0]
-            time.sleep(max(0, next_time - current_time))
+            time.sleep(max(0, next_time - current_time) / speed)
     producer.flush()
     logging.info("Data streaming completed.")
 
@@ -52,18 +52,19 @@ if __name__ == "__main__":
     time.sleep(2)  # Make sure to wait for InfluxDB and Kafka to start
 
     # Simulation Parameters
-    table_name = "simulation_3"
-    is_constellation = True
-    satellites = 3
+    table_name = "simulation_1"
+    is_constellation = False
+    satellites = 1
+    speed = 100  # Speed up the simulation by __ times
 
     # Stream Data
     if is_constellation:
         threads = []
         for sat_id in range(1, satellites + 1):
-            t = threading.Thread(target=stream_data, args=(table_name, 'telemetry', sat_id))
+            t = threading.Thread(target=stream_data, args=(table_name, 'telemetry', sat_id, speed))
             threads.append(t)
             t.start()
         for t in threads:
             t.join()
     else:
-        stream_data(table_name)
+        stream_data(table_name, speed=speed)

@@ -1,0 +1,478 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 2,
+    "links": [],
+    "panels": [
+      {
+        "type": "piechart",
+        "title": "Anomalies by Metric",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "P951FEA4DE68E13C5"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P951FEA4DE68E13C5"
+            },
+            "measurement": "anomalies",
+            "query": "SELECT COUNT(*) AS \"count\" FROM \"anomalies\" GROUP BY \"metric\"",
+            "rawQuery": true,
+            "resultFormat": "time_series"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": [],
+            "showLegend": true
+          },
+          "pieType": "pie",
+          "displayLabels": ["value", "percent"],
+          "labels": {
+            "show": true
+          }
+        },
+        "pluginVersion": "11.3.0",
+        "id": 1
+      },
+      {
+        "type": "piechart",
+        "title": "Anomalies by Type",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "P951FEA4DE68E13C5"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P951FEA4DE68E13C5"
+            },
+            "measurement": "anomalies",
+            "query": "SELECT COUNT(*) AS \"count\" FROM \"anomalies\" GROUP BY \"is_sat\"",
+            "rawQuery": true,
+            "resultFormat": "time_series"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": [],
+            "showLegend": true
+          },
+          "pieType": "pie",
+          "displayLabels": ["value", "percent"],
+          "labels": {
+            "show": true
+          }
+        },
+        "pluginVersion": "11.3.0",
+        "id": 2
+      },
+      {
+        "type": "barchart",
+        "title": "Top Satellites by Number of Anomalies",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "P951FEA4DE68E13C5"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P951FEA4DE68E13C5"
+            },
+            "measurement": "anomalies",
+            "query": "SELECT COUNT(*) AS \"count\" FROM \"anomalies\" WHERE \"is_sat\"=true GROUP BY \"satellite_id\"",
+            "rawQuery": true,
+            "resultFormat": "time_series"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": [],
+            "showLegend": true
+          },
+          "orientation": "vertical",
+          "xAxis": {
+            "show": true,
+            "mode": "series",
+            "name": "Satellite ID",
+            "values": []
+          },
+          "yAxis": {
+            "show": true,
+            "label": "Number of Anomalies",
+            "logBase": 1,
+            "min": 0
+          },
+          "displayMode": "lcd",
+          "fieldOptions": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          }
+        },
+        "pluginVersion": "11.3.0",
+        "id": 3,
+        "annotations": {
+          "list": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "P951FEA4DE68E13C5"
+              },
+              "enable": true,
+              "iconColor": "rgba(255, 96, 96, 1)",
+              "name": "Anomalies",
+              "query": "SELECT \"message\" FROM \"anomalies\" WHERE \"is_sat\"=false AND \"metric\"='velocity' AND \"satellite_id\"=1",
+              "rawQuery": true,
+              "type": "query",
+              "showIn": 1,
+              "titleFormat": "{{message}}",
+              "textFormat": "{{message}}"
+            }
+          ]
+        }
+      },
+      {
+        "type": "barchart",
+        "title": "Anomalies by Anomaly Model",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "P951FEA4DE68E13C5"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P951FEA4DE68E13C5"
+            },
+            "measurement": "anomalies",
+            "query": "SELECT COUNT(*) AS \"count\" FROM \"anomalies\" GROUP BY \"anomaly_model\"",
+            "rawQuery": true,
+            "resultFormat": "time_series"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": [],
+            "showLegend": true
+          },
+          "orientation": "vertical",
+          "xAxis": {
+            "show": true,
+            "mode": "series",
+            "name": "Anomaly Model",
+            "values": []
+          },
+          "yAxis": {
+            "show": true,
+            "label": "Number of Anomalies",
+            "logBase": 1,
+            "min": 0
+          },
+          "displayMode": "lcd",
+          "fieldOptions": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          }
+        },
+        "pluginVersion": "11.3.0",
+        "id": 4
+      },
+      {
+        "type": "timeseries",
+        "title": "Number of Anomalies Over Time",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "P951FEA4DE68E13C5"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P951FEA4DE68E13C5"
+            },
+            "measurement": "anomalies",
+            "query": "SELECT COUNT(*) AS \"count\" FROM \"anomalies\" GROUP BY time($__interval) fill(null)",
+            "rawQuery": true,
+            "resultFormat": "time_series"
+          }
+        ],
+        "gridPos": {
+          "h": 12,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "lineInterpolation": "smooth",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "showPoints": "auto",
+              "pointSize": 5
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "calcs": [],
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          },
+          "interaction": {
+            "zoom": true,
+            "pan": true
+          },
+          "displayMode": "gradient",
+          "lineInterpolation": "smooth"
+        },
+        "pluginVersion": "11.3.0",
+        "id": 5
+      },
+      {
+        "type": "stat",
+        "title": "Total Number of Anomalies",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "P951FEA4DE68E13C5"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P951FEA4DE68E13C5"
+            },
+            "measurement": "anomalies",
+            "query": "SELECT COUNT(*) AS \"count\" FROM \"anomalies\"",
+            "rawQuery": true,
+            "resultFormat": "time_series"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 28
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 100
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "orientation": "auto",
+          "textMode": "value",
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "displayName": "",
+          "prefix": "",
+          "postfix": ""
+        },
+        "pluginVersion": "11.3.0",
+        "id": 6
+      },
+      {
+        "type": "table",
+        "title": "Recent Anomalies",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "P951FEA4DE68E13C5"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P951FEA4DE68E13C5"
+            },
+            "measurement": "anomalies",
+            "query": "SELECT \"metric\", \"message\", \"satellite_id\", \"anomalous_value\", \"anomaly_model\" FROM \"anomalies\" ORDER BY time DESC LIMIT 100",
+            "rawQuery": true,
+            "resultFormat": "table"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 36
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": []
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "time",
+              "desc": true
+            }
+          ]
+        },
+        "pluginVersion": "11.3.0",
+        "id": 7
+      }
+    ],
+    "schemaVersion": 40,
+    "tags": [],
+    "templating": {
+      "list": []
+    },
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Constellation Metrics Dashboard",
+    "uid": "constellation-metrics-dashboard",
+    "version": 1,
+    "weekStart": ""
+  }
+  

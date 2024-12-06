@@ -186,7 +186,8 @@ class AnomalyDetectionManager:
             "fields": {
                 "metric": details.metric,
                 "anomalous_value": details.value,
-                "message": details.message
+                "message": details.message,
+                "time_end": (details.time_end if (hasattr(details, 'time_end') and details.time_end is not None) else details.time)
             }
         }
         self.influx_client.write_points([anomaly], time_precision='s')
