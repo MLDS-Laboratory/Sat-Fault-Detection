@@ -45,12 +45,19 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
             AnomalyDetails: Details of the anomaly if detected. Otherwise, return None.
         """
         logging.info(f'Outlier detection model reports: {self.metric} - {self.threshold}')
-        if self.metric is not None:
+        if self.metric is not None and not isinstance(self.metric, list):
             data = self.detect_field(data['time'], self.metric, data['data'])
             if data is not None:
                 return True, data
             else:
                 return False, None
+            
+        elif isinstance(self.metric, list):
+            for field in self.metric:
+                logging.info(f"--------------------------------- {field}")
+                anomaly_data = self.detect_field(data['time'], field, data['data'])
+                if anomaly_data is not None:
+                    return True, anomaly_data
         else:
             for field in data:
                 anomaly_data = self.detect_field(data['time'], field, data['data'])

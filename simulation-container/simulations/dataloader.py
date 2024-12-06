@@ -12,7 +12,7 @@ def generate_data(simulation_id):
     cursor = conn.cursor()
 
     times, pos, velo, sigma, omega, CSSdata, disturbances, sensedSun, sunPoint = sc.run(False, False, True, False)
-    times2, pos2, velo2, sigma2, omega2, CSSdata2, disturbances2, sensedSun2, sunPoint2 = sc.run(False, False, True, False)
+    # times2, pos2, velo2, sigma2, omega2, CSSdata2, disturbances2, sensedSun2, sunPoint2 = sc.run(False, False, True, False)
     # Create a new table with flexible schema (JSONB for now, but later maybe column headers)
     table_name = f"simulation_{simulation_id}"
     cursor.execute(sql.SQL("""
