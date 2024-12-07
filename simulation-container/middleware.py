@@ -52,10 +52,10 @@ if __name__ == "__main__":
     time.sleep(2)  # Make sure to wait for InfluxDB and Kafka to start
 
     # Simulation Parameters
-    table_name = "simulation_1"
-    is_constellation = False
-    satellites = 1
-    speed = 100  # Speed up the simulation by __ times
+    table_name = "simulation_2"
+    is_constellation = True
+    satellites = 2
+    speed = 50  # Speed up the simulation by __ times
 
     # Stream Data
     if is_constellation:

@@ -27,6 +27,12 @@
           },
           "hide": false,
           "iconColor": "red",
+          "mappings": {
+            "timeEnd": {
+              "source": "field",
+              "value": "timeEnd"
+            }
+          },
           "name": "Anomaly Annotations",
           "target": {
             "fromAnnotations": true,
@@ -35,7 +41,8 @@
             "refId": "Anno",
             "tagsColumn": "metric",
             "textColumn": "message",
-            "textEditor": true
+            "textEditor": true,
+            "timeEndColumn": "time(timeEnd)"
           }
         }
       ]
@@ -43,7 +50,7 @@
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 0,
-    "id": 1,
+    "id": 3,
     "links": [],
     "panels": [
       {
@@ -192,6 +199,6 @@
     "timezone": "",
     "title": "Satellite Dashboard",
     "uid": "satellite-dashboard",
-    "version": 14,
+    "version": 1,
     "weekStart": ""
   }

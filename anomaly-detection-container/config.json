@@ -5,8 +5,8 @@
         "OutlierDetectionModel": {
             "path": "./satellite/outlier_detection.py",
             "parameters": {
-                "threshold": 1,
-                "metric": ["CSS_3", "CSS_5"]
+                "threshold": 2,
+                "metric": ["CSS_4", "CSS_5"]
             }
         }
     }
