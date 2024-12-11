@@ -76,5 +76,8 @@ COPY middleware.py /basilisk/middleware.py
 # Expose PostgreSQL port
 EXPOSE 5432
 
+# Automatically activate the virtual environment in any new shell
+RUN echo "source /basilisk/.venv/bin/activate" >> /root/.bashrc
+
 # Start supervisord to manage PostgreSQL
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

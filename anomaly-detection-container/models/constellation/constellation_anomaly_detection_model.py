@@ -1,5 +1,17 @@
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+# Details class for an anomaly detection model to return
+@dataclass
+class AnomalyDetails:
+    satellite_id: int
+    anomaly_model: str
+    time: int
+    time_end: int
+    metric: str
+    value: float
+    message: str
 
 class ConstellationAnomalyDetectionModel(ABC):
     """
@@ -7,7 +19,7 @@ class ConstellationAnomalyDetectionModel(ABC):
     """
 
     @abstractmethod
-    def detect(self, data):
+    def detect(self, data) -> tuple[bool, AnomalyDetails]:
         """
         Process incoming data and detect anomalies at the constellation level.
 

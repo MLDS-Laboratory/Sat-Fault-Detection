@@ -6,6 +6,7 @@ import json
 import threading
 from kafka import KafkaProducer
 import logging
+import sys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
@@ -51,8 +52,13 @@ if __name__ == "__main__":
 
     time.sleep(2)  # Make sure to wait for InfluxDB and Kafka to start
 
+    # get the table name from the arguments
+    if len(sys.argv) < 2:
+        table_name = "simulation_2"
+    else:
+        table_name = sys.argv[1]
+
     # Simulation Parameters
-    table_name = "simulation_2"
     is_constellation = True
     satellites = 2
     speed = 50  # Speed up the simulation by __ times
