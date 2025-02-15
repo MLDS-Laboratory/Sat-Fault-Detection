@@ -33,15 +33,14 @@ WORKDIR /basilisk
 RUN python3 -m venv .venv
 
 # Activate the virtual environment and install pip dependencies for Basilisk
-RUN /bin/bash -c "source .venv/bin/activate && pip install --upgrade pip && pip install wheel 'conan<2.0' cmake"
+RUN /bin/bash -c "source .venv/bin/activate && pip install --upgrade pip && pip install wheel 'conan' cmake packaging"
 
 # Initialize the default Conan profile for Basilisk
-RUN /bin/bash -c "source .venv/bin/activate && conan profile new default --detect"
+RUN /bin/bash -c "source .venv/bin/activate && conan profile detect"
 
 # Update Conan profile settings for Basilisk
-RUN /bin/bash -c "source .venv/bin/activate && conan profile update settings.compiler.libcxx=libstdc++11 default"
+RUN /bin/bash -c "source .venv/bin/activate && echo 'compiler.libcxx=libstdc++11' >> ~/.conan2/profiles/default"
 
-# Install dependencies with Conan for Basilisk
 RUN /bin/bash -c "source .venv/bin/activate && conan install . --build=missing -s build_type=Release"
 
 # Run the Basilisk build
