@@ -11,8 +11,8 @@ def generate_data(simulation_id):
     )
     cursor = conn.cursor()
 
-    times, pos, velo, sigma, omega, CSSdata, disturbances, sensedSun, sunPoint = sc.run(False, False, True, False)
-    times2, pos2, velo2, sigma2, omega2, CSSdata2, disturbances2, sensedSun2, sunPoint2 = sc.run(False, False, True, False)
+    times, pos, velo, sigma, omega, CSSdata, motorTorque, thrLog, sensedSun, sunPoint = sc.run(False, False, True, False)
+    times2, pos2, velo2, sigma2, omega2, CSSdata2, motorTorque2, thrLog2, sensedSun2, sunPoint2 = sc.run(False, False, True, False)
     # Create a new table with flexible schema (JSONB for now, but later maybe column headers)
     table_name = f"simulation_{simulation_id}"
     cursor.execute(sql.SQL("""
@@ -46,9 +46,12 @@ def generate_data(simulation_id):
             "CSS_4": CSSdata[3, i],
             "CSS_5": CSSdata[4, i],
             "CSS_6": CSSdata[5, i],
-            "x_torque": disturbances[i][0],
-            "y_torque": disturbances[i][1],
-            "z_torque": disturbances[i][2],
+            "RW_1": motorTorque[0][i],
+            "RW_2": motorTorque[1][i],
+            "RW_3": motorTorque[2][i],
+            "Thruster_1": thrLog[0][i],
+            "Thruster_2": thrLog[1][i],
+            "Thruster_3": thrLog[2][i],
             "sun_x_sensed": sensedSun[i][0],
             "sun_y_sensed": sensedSun[i][1],
             "sun_z_sensed": sensedSun[i][2],
@@ -76,9 +79,12 @@ def generate_data(simulation_id):
             "CSS_4": CSSdata2[3, i],
             "CSS_5": CSSdata2[4, i],
             "CSS_6": CSSdata2[5, i],
-            "x_torque": disturbances2[i][0],
-            "y_torque": disturbances2[i][1],
-            "z_torque": disturbances2[i][2],
+            "RW_1": motorTorque2[0][i],
+            "RW_2": motorTorque2[1][i],
+            "RW_3": motorTorque2[2][i],
+            "Thruster_1": thrLog2[0][i],
+            "Thruster_2": thrLog2[1][i],
+            "Thruster_3": thrLog2[2][i],
             "sun_x_sensed": sensedSun2[i][0],
             "sun_y_sensed": sensedSun2[i][1],
             "sun_z_sensed": sensedSun2[i][2],
@@ -102,7 +108,7 @@ def generate_data(simulation_id):
     conn.close()
 
 if __name__ == "__main__":
-    generate_data(simulation_id=5)
+    generate_data(simulation_id=3042025)
 
     # print the table names
     conn = psycopg2.connect(

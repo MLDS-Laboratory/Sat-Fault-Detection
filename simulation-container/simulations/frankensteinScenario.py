@@ -14,6 +14,8 @@ from Basilisk.utilities import unitTestSupport
 from Basilisk.utilities import RigidBodyKinematics as rbk
 from Basilisk.utilities import fswSetupRW
 from Basilisk.utilities import simIncludeRW
+from Basilisk.utilities import simIncludeGravBody
+from Basilisk.utilities import simIncludeThruster
 
 #simulation tools
 
@@ -22,15 +24,16 @@ from Basilisk.simulation import reactionWheelStateEffector
 from Basilisk.simulation import motorVoltageInterface
 from Basilisk.simulation import spacecraft
 from Basilisk.simulation import extForceTorque
-from Basilisk.utilities import simIncludeGravBody
 from Basilisk.simulation import simpleNav
 from Basilisk.simulation import eclipse
+from Basilisk.simulation import thrusterDynamicEffector
 
 from Basilisk.fswAlgorithms import attTrackingError
 from Basilisk.fswAlgorithms import inertial3D
 from Basilisk.fswAlgorithms import mrpFeedback
 from Basilisk.fswAlgorithms import rwMotorTorque
 from Basilisk.fswAlgorithms import rwMotorVoltage
+from Basilisk.fswAlgorithms import velocityPoint
 
 #general simulation initialization, i think
 from Basilisk.utilities import SimulationBaseClass
@@ -42,9 +45,9 @@ def run(vfault, rwfault, sfault, plot):
     simProcessName = "mr. sim"
 
     satSim = SimulationBaseClass.SimBaseClass()
-
+    timestep = 5
     dynamics = satSim.CreateNewProcess(simProcessName)
-    simulationTimeStep = macros.sec2nano(5)
+    simulationTimeStep = macros.sec2nano(timestep)
     dynamics.addTask(satSim.CreateNewTask(simTaskName, simulationTimeStep))
 
     satellite = spacecraft.Spacecraft()
@@ -120,6 +123,38 @@ def run(vfault, rwfault, sfault, plot):
     satSim.AddModelToTask(simTaskName, nav)
     nav.scStateInMsg.subscribeTo(satellite.scStateOutMsg)
     nav.sunStateInMsg.subscribeTo(spice.planetStateOutMsgs[1])
+
+    "Thruster Setup"
+    #state effector
+    thrusterSet = thrusterDynamicEffector.ThrusterDynamicEffector()
+    satSim.AddModelToTask(simTaskName, thrusterSet, 2)
+
+    #creating the actual thrusters
+    thFactory = simIncludeThruster.thrusterFactory()
+    location = [[0, 0, 1], [0, 1, 0], [1, 0, 0]]
+    direction = [[0, 0, -1], [0, -1, 0], [-1, 0, 0]]
+    for (pos, direct) in zip(location, direction):
+        thFactory.create('Blank_Thruster', pos, direct, MaxThrust=500.0)
+    thrTimeData = messaging.THRArrayOnTimeCmdMsgPayload()
+    thrTimeData.OnTimeRequest = np.zeros(len(location))
+    thrTimeMsg = messaging.THRArrayOnTimeCmdMsg().write(thrTimeData)
+    thrusterSet.cmdsInMsg.subscribeTo(thrTimeMsg)
+    
+
+    #adding thrusters to satellite
+    thrModelTag = "Thrusters"
+    thFactory.addToSpacecraft(thrModelTag, thrusterSet, satellite)
+
+
+
+    """note: i've added this for future use in different flight modes; for now it does nothing"""
+    # setup module that makes satellite point towards its velocity vector
+    attGuidance = velocityPoint.velocityPoint()
+    attGuidance.ModelTag = "velocityPoint"
+    attGuidance.transNavInMsg.subscribeTo(nav.transOutMsg)
+    attGuidance.mu = earth.mu
+    """commented out so this is ineffective"""
+    #satSim.AddModelToTask(simTaskName, attGuidance)
 
     #inertial reference attitude
     inertial = inertial3D.inertial3D()
@@ -313,6 +348,12 @@ def run(vfault, rwfault, sfault, plot):
         rwTorqueLog.append(rwEffector.rwOutMsgs[i].recorder(samplingTime))
         satSim.AddModelToTask(simTaskName, rwTorqueLog[i])
 
+    #thruster recorders
+    thrLog = []
+    for i in range(thFactory.getNumOfDevices()):
+        thrLog.append(thrusterSet.thrusterOutMsgs[i].recorder(samplingTime))
+        satSim.AddModelToTask(simTaskName, thrLog[i])
+
     
     #set up the simulation
     satSim.InitializeSimulation()
@@ -325,17 +366,37 @@ def run(vfault, rwfault, sfault, plot):
 
     #for plotting purposes
     sensedSun = []
-    global done 
-    done = True
     #self-explanatory
     def fault_addition():
-        global done
         rand = random.random()
         #random delta-v faults
-        if vfault and rand < 0.001:
+        if vfault and rand < 0.01:
+            forces = []
+            thrustTime = []
+            for i in thFactory.thrusterList:
+                randf = random.random() * 500.
+                randt = random.random() * timestep + timestep 
+                #^^last between 1 and 2 timesteps, so it shows up on the plot
+                rand2 = random.random() * 10.
+                if rand2 < 1:
+                    forces.append(randf)
+                    thrustTime.append(randt)
+                else:
+                    forces.append(500.)
+                    thrustTime.append(0.)
+            thFactory.thrusterList = OrderedDict([])
+            thrusterSet.thrusterData = thrusterSet.thrusterData[:0]
+            #thrusterSet.thrusterOutMsgs = thrusterSet.thrusterOutMsgs[:0]#Reset(satSim.TotalSim.CurrentNanos)
+            for (pos, direct, force) in zip(location, direction, forces):
+                temp = thFactory.create('Blank_Thruster', pos, direct, MaxThrust=force)
+                thrusterSet.addThruster(temp)
+            thrTimeData.OnTimeRequest = thrustTime
+            thrTimeMsg.write(thrTimeData, time=satSim.TotalSim.CurrentNanos)
+            
+            """
             rand = random.random() - 0.5
             velo = unitTestSupport.EigenVector3d2np(velRef.getState())
-            velRef.setState([x + y for x, y in zip(velo, [1 * rand, 1 * rand, 0.25 * rand])])
+            velRef.setState([x + y for x, y in zip(velo, [1 * rand, 1 * rand, 0.25 * rand])])"""
 
         #random RW torque limit changes
         if rwfault and rand < 0.01: #0.001
@@ -391,7 +452,6 @@ def run(vfault, rwfault, sfault, plot):
         
 
     #actual execution loop
-    reset = False
     while satSim.TotalSim.CurrentNanos < simTime:
         satSim.TotalSim.SingleStepProcesses()
         #msgs.append(stateReader)
@@ -419,27 +479,37 @@ def run(vfault, rwfault, sfault, plot):
 
     sigma  = np.array(satLog.sigma_BN)
     omega = np.array(satLog.omega_BN_B)
-    
+
+    motorTorque = [rw.u_current for rw in rwTorqueLog]
+    thrustLog = [thruster.thrustForce for thruster in thrLog]
     #plotting
     if plot:
         plt.close("all")
         if vfault:
-            #plot position relative to planet
             plt.figure(1)
+            for i in range(thFactory.getNumOfDevices()):
+                plt.plot(satLog.times() * macros.NANO2SEC / period, thrustLog[i], label=f'Thruster {i+1}')
+            plt.legend()
+            plt.title("Thruster Outputs")
+            plt.xlabel("Time [orbits]")
+            plt.ylabel("Thrust [N]")
+
+            #plot position relative to planet
+            plt.figure(2)
             for i in range(3):
-                plt.plot(timeAxis * macros.NANO2SEC / period, pos[:, i] / 1000,
+                plt.plot(satLog.times() * macros.NANO2SEC / period, pos[:, i] / 1000,
                          color=unitTestSupport.getLineColor(i, 3))
             plt.title("Planet-relative Cartesian Position")
-            plt.legend(["x", "y", "z"])
+            plt.legend(["x", "y", "z", 'vx', 'vy', 'vz'])
             plt.xlabel("Time [orbits]")
             plt.ylabel("Position [km]")
 
             #plot differences from theoretical orbit to numerical solution
             #intended to display impact of delta-v faults
-            #note that in long enough sims and orbits far away enough from earth,
-            #this will be significant even w/o faults because i've added the sun's influence
-            #entirely copied from scenarioBasicOrbit
-            plt.figure(2) 
+            """note that in long enough sims and orbits far away enough from earth,
+            this will be significant even w/o faults because i've added the sun's influence"""
+            #entirely copied from scenarioBasicOrbit.py
+            plt.figure(3) 
             timeAxis = satLog.times()
             fig = plt.gcf()
             ax = fig.gca()
@@ -454,14 +524,16 @@ def run(vfault, rwfault, sfault, plot):
                 Et = orbitalMotion.M2E(M, oe.e)
                 oe2.f = orbitalMotion.E2f(Et, oe.e)
                 rv, vv = orbitalMotion.elem2rv(earth.mu, oe2)
+                #Deltar = np.append(Deltar, [rv], axis=0)
                 Deltar = np.append(Deltar, [pos[idx] - rv], axis=0)
             for idx in range(3):
-                plt.plot(timeAxis * macros.NANO2SEC / period, Deltar[:, idx] ,
+                plt.plot(satLog.times() * macros.NANO2SEC / period, Deltar[:, idx] ,
                          color=unitTestSupport.getLineColor(idx, 3),
                          label=r'$\Delta r_{BN,' + str(idx+1) + '}$')
-                plt.legend(loc='lower right')
-                plt.xlabel('Time [orbits]')
-                plt.ylabel('Trajectory Differences [m]')
+            plt.legend(loc='lower right')
+            plt.xlabel('Time [orbits]')
+            plt.ylabel('Trajectory Differences [m]')
+            plt.title("Cartesian Distance Between Keplerian and Simulated Orbit")
 
         if rwfault:
             #RW Wheel Speeds
@@ -483,7 +555,6 @@ def run(vfault, rwfault, sfault, plot):
             plt.ylabel("Torque [N-m]")
 
             #RW motor actual torques
-            motorTorque = [rw.u_current for rw in rwTorqueLog]
             plt.figure(6)
             for i in range(numRW):
                 plt.plot(satLog.times() / period, motorTorque[i], label=f'RW {i+1}')
@@ -546,10 +617,10 @@ def run(vfault, rwfault, sfault, plot):
         plt.tight_layout()
         plt.show()
 
-        
+    
     """MODIFY"""
-    return satLog.times(), pos, velo, sigma, omega, CSSdata, motorTorque, sensedSun, sunPoint
+    return satLog.times(), pos, velo, sigma, omega, CSSdata, motorTorque, thrustLog, sensedSun, sunPoint
 
 if __name__ == "__main__":
     #vfault, rwfault, sfault, plot
-    run(False, True, False, True)
+    run(False, False, False, False)
