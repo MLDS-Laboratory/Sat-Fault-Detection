@@ -14,7 +14,7 @@ class Fault(ABC):
 
         Parameters:
             components (Collection): the components in which to (potentially) inject the fault
-            defaults: a Collection of the default settings for each component
+            defaults: a dictionary of the default settings for each component
         """
         self.components = components
         self.defaults = kwargs.get("defaults") if kwargs.get("defaults") else None
@@ -45,10 +45,12 @@ class Fault(ABC):
         pass
 
     @abstractmethod
-    def reset(self):
+    def reset(self) -> bool:
         """
         Reset all components to settings pre-fault injections, if defaults are given. 
         
+        Returns:
+            bool: True if successful
         """
         pass
 
