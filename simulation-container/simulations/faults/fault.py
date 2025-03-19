@@ -20,7 +20,7 @@ class Fault(ABC):
         self.defaults = kwargs.get("defaults") if kwargs.get("defaults") else None
     
     @abstractmethod
-    def inject(self) -> Collection[Any]:
+    def inject(self, newSettings) -> Collection[Any]:
         """
         Inject a predefined fault. 
 
