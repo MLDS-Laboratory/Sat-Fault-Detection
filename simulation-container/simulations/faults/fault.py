@@ -64,7 +64,7 @@ class Fault(ABC):
         Returns:
             toInject (list[bool]): Indicates whether a fault is to be injected to the component at this index 
         """
-        if not 0 <= chance <= 1:
+        if not 0. <= chance <= 1.:
             raise ValueError("Chance must be between 0 and 1.")
         seed = kwargs.get("seed")
         if seed is not None:
