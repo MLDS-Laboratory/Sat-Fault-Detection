@@ -14,7 +14,7 @@ def generate_data(simulation_id):
     times, pos, velo, sigma, omega, CSSdata, motorTorque, thrLog, sensedSun, sunPoint = sc.run(False, False, True, False)
     times2, pos2, velo2, sigma2, omega2, CSSdata2, motorTorque2, thrLog2, sensedSun2, sunPoint2 = sc.run(False, False, True, False)
     # Create a new table with flexible schema (JSONB for now, but later maybe column headers)
-    table_name = f"simulation_{simulation_id}"
+    table_name = f"frankenstein_simulation_{simulation_id}"
     cursor.execute(sql.SQL("""
         CREATE TABLE IF NOT EXISTS {} (
             time INTEGER,

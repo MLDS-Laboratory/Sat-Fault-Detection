@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 from faults.rwfault import RWFault
+import psycopg2
+from psycopg2 import sql
+import json  
 
 #utilities?
 from Basilisk.architecture import messaging
@@ -30,7 +33,7 @@ from Basilisk.fswAlgorithms import rwMotorTorque
 #general simulation initialization, i think
 from Basilisk.utilities import SimulationBaseClass
 
-def run(plot):
+def simulate(plot):
     #a bunch of initializations
     simTaskName = "sim city"
     simProcessName = "mr. sim"
@@ -257,15 +260,15 @@ def run(plot):
         for i in range(len(faultLog[-1])):
             if len(faultLog) > 1 and faultLog[-2][i] == 1:
                 faultLog[-1][i] = 1
-        print(temp)
 
     faultLog = np.array(faultLog)
     motorTorque = [rw.u_current for rw in rwTorqueLog]
+    sigma  = np.array(satLog.sigma_BN)
 
     """plotting"""
     if plot:
         plt.figure(1)
-        sigma  = np.array(satLog.sigma_BN)
+        
         for i in range(3):
             plt.plot(satLog.times() / period, sigma[:, i], label=rf"$\sigma_{i+1}$")
         plt.title("Inertial Orientation")
@@ -304,10 +307,56 @@ def run(plot):
 
         plt.tight_layout()
         plt.show()
+    return satLog.times(), sigma, rwMotorLog.motorTorque[:, :3], motorTorque, faultLog
 
+def run(plot, simulation_id):
+    times, sigma, torque_desired, torque_actual, faults = simulate(plot)
+    conn = psycopg2.connect(
+        host="localhost",
+        database="telemetry_db",
+        user="postgres",
+    )
+    cursor = conn.cursor()
+
+    table_name = f"simpleRWFault_simulation_{simulation_id}"
+    cursor.execute(sql.SQL("""
+        CREATE TABLE IF NOT EXISTS {} (
+            time INTEGER,
+            satellite_id INTEGER,
+            data JSONB,
+            PRIMARY KEY (time, satellite_id)
+        );
+    """).format(sql.Identifier(table_name)))
+    conn.commit()
+
+    for i in range(len(times)):
+
+        data_payload = {
+            "x_sigma": sigma[i, 0],
+            "y_sigma": sigma[i, 1],
+            "z_sigma": sigma[i, 2],
+            "FSW_RW_1": torque_desired[i, 0],
+            "FSW_RW_2": torque_desired[i, 1],
+            "FSW_RW_3": torque_desired[i, 2],
+            "RW_1": torque_actual[0][i],
+            "RW_2": torque_actual[1][i],
+            "RW_3": torque_actual[2][i],
+            "fault_state_RW_1": faults[i, 0],
+            "fault_state_RW_2": faults[i, 1],
+            "fault_state_RW_3": faults[i, 2]
+        }
+
+        cursor.execute(sql.SQL("""
+                INSERT INTO {} (time, satellite_id, data)
+                VALUES (%s, %s, %s);
+            """).format(sql.Identifier(table_name)), (i*5, 1, json.dumps(data_payload)))
+        conn.commit()
+
+    cursor.close()
+    conn.close()
 
 if __name__ == "__main__":
-    run(False)
+    run(False, simulation_id=3192025)
 
 
 
