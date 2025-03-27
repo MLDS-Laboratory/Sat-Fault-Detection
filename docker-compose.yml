@@ -1,83 +1,89 @@
 version: '3.8'
 
 services:
-  sim_middleware:
-    build: ./simulation-container
-    volumes:
-      - ./simulation-container/simulations:/basilisk/simulations
-      - ./simulation-container/middleware.py:/basilisk/middleware.py
-      - pgdata:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: telemetry_db
-    depends_on:
-      - kafka
-    restart: always  # Ensures the container restarts on failure
-    networks:
-      - telemetry-network
+    sim_middleware:
+        build: ./simulation-container
+        volumes:
+        - ./simulation-container/simulations:/basilisk/simulations
+        - ./simulation-container/middleware.py:/basilisk/middleware.py
+        - pgdata:/var/lib/postgresql/data
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: telemetry_db
+        depends_on:
+        - kafka
+        restart: always
+        networks:
+        - telemetry-network
 
-  kafka:
-    image: bitnami/kafka:latest
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-    depends_on:
-      - zookeeper
-    restart: always
-    networks:
-      - telemetry-network
+    kafka:
+        image: bitnami/kafka:latest
+        environment:
+            KAFKA_CFG_PROCESS_ROLES: broker,controller        # Enable both broker and controller roles
+            KAFKA_CFG_NODE_ID: "1"                            # Unique ID for this Kafka node
+            KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER   # Define the listener name that the controller should use
+            KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"        # default quorum for a single node
+            KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+            KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+        restart: always
+        networks:
+        - telemetry-network
 
-  zookeeper:
-    image: bitnami/zookeeper:latest
-    environment:
-      ALLOW_ANONYMOUS_LOGIN: 'yes'
-    restart: always
-    networks:
-      - telemetry-network
+    ccsds_ingest:
+        build: ./ccsds-ingest-container
+        volumes:
+        - ./ccsds-ingest-container/ccsds_ingest.py:/app/ccsds_ingest.py
+        - ./ccsds-ingest-container/ccsds_config.json:/app/ccsds_config.json
+        depends_on:
+        - kafka
+        - influx_telegraf
+        restart: always
+        networks:
+        - telemetry-network
 
-  influx_telegraf:
-    build: ./influx_telegraf-container
-    volumes:
-      - ./influx_telegraf-container/influxdb.conf:/etc/influxdb/influxdb.conf
-      - ./influx_telegraf-container/telegraf.conf:/etc/telegraf/telegraf.conf
-    depends_on:
-      - kafka
-    networks:
-      - telemetry-network
+    influx_telegraf:
+        build: ./influx_telegraf-container
+        volumes:
+        - ./influx_telegraf-container/influxdb.conf:/etc/influxdb/influxdb.conf
+        - ./influx_telegraf-container/telegraf.conf:/etc/telegraf/telegraf.conf
+        depends_on:
+        - kafka
+        networks:
+        - telemetry-network
 
-  anomaly_detection:
-    build: ./anomaly-detection-container
-    volumes:
-      - ./anomaly-detection-container:/app
-      - ./anomaly-detection-container/models:/app/models
-      - ./anomaly-detection-container/config.json:/app/config.json
-    depends_on:
-      - kafka
-      - influx_telegraf
-    restart: always
-    networks:
-      - telemetry-network
+    anomaly_detection:
+        build: ./anomaly-detection-container
+        volumes:
+        - ./anomaly-detection-container:/app
+        - ./anomaly-detection-container/models:/app/models
+        - ./anomaly-detection-container/config.json:/app/config.json
+        depends_on:
+        - kafka
+        - influx_telegraf
+        restart: always
+        networks:
+        - telemetry-network
 
-  grafana:
-    build: ./grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
-    depends_on:
-      - influx_telegraf
-    restart: always
-    networks:
-      - telemetry-network
+    grafana:
+        build: ./grafana
+        ports:
+        - "3000:3000"
+        volumes:
+        - ./grafana/provisioning:/etc/grafana/provisioning
+        - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
+        depends_on:
+        - influx_telegraf
+        restart: always
+        networks:
+        - telemetry-network
 
 volumes:
-  influx_telegraf_data:
-  pgdata:
+    # removed volume for influx to avoid front-end persists, can be added back if helps
+    # influx_telegraf_data:
+    pgdata:
 
 networks:
-  telemetry-network:
-    driver: bridge
+    telemetry-network:
+        driver: bridge

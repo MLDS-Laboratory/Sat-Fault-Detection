@@ -1,0 +1,26 @@
+{
+    "ccsds": {
+      "header": {
+        "length": 7,
+        "fields": {
+          "version": { "offset": 0, "length": 1, "type": "uint8" },
+          "satellite_id": { "offset": 1, "length": 1, "type": "uint8" },
+          "packet_id": { "offset": 2, "length": 1, "type": "uint8" },
+          "timestamp": { "offset": 3, "length": 4, "type": "uint32", "optional": true }
+        }
+      },
+      "data_field": {
+        "length": 12,
+        "fields": [
+          { "name": "battery_voltage", "offset": 0, "length": 4, "type": "float" },
+          { "name": "battery_current", "offset": 4, "length": 4, "type": "float" },
+          { "name": "temperature", "offset": 8, "length": 4, "type": "float" }
+        ]
+      },
+      "crc_length": 2
+    },
+    "aggregation": {
+      "time_window": 1
+    }
+  }
+  
