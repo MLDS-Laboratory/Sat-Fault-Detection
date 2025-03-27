@@ -7,7 +7,7 @@ This system simulates satellite telemetry data, streams it through Kafka, proces
 - **Basilisk Simulation**: Generates telemetry data simulating satellite conditions. 
 - **PostgreSQL**: Stores historical telemetry data. 
 - **Middleware (`middleware.py`)**: Reads data from PostgreSQL, injects simulation metadata, and streams it into Kafka. 
-- **Kafka & Zookeeper**: Provides a high-throughput messaging backbone for real-time data ingestion. 
+- **Kafka**: Provides a high-throughput messaging backbone for real-time data ingestion. 
 - **Telegraf & InfluxDB**: Telegraf consumes Kafka messages and writes metrics into InfluxDB, a time-series database. 
 - **Anomaly Detection**: Consumes data from Kafka to detect anomalies at both constellation and satellite levels. Results are written to InfluxDB. 
 - **Grafana**: Visualizes telemetry data and anomalies, enabling users to explore trends and anomalies over time. 
@@ -57,7 +57,7 @@ cd Sat-Fault-Detection
 docker-compose build 
 docker-compose up -d
 ```
-This starts PostgreSQL, Kafka, Zookeeper, Telegraf, InfluxDB, Grafana, and the anomaly detection service.
+This starts PostgreSQL, Kafka, Telegraf, InfluxDB, Grafana, and the anomaly detection service.
 
 ## Usage
 To use the system, you can interact with each container by opening its terminal either by running `docker-compose up -it <name_of_container>` or opening the terminal under Docker Desktop. 
