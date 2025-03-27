@@ -8,6 +8,7 @@ This system simulates satellite telemetry data, streams it through Kafka, proces
 - **PostgreSQL**: Stores historical telemetry data. 
 - **Middleware (`middleware.py`)**: Reads data from PostgreSQL, injects simulation metadata, and streams it into Kafka. 
 - **Kafka**: Provides a high-throughput messaging backbone for real-time data ingestion. 
+- **CCSDS Ingest Service**: Translates CCSDS bytestreams into a format suitable for InfluxDB. Listens to raw bytestream inputs and parses the byte streams according to a configurable schema.
 - **Telegraf & InfluxDB**: Telegraf consumes Kafka messages and writes metrics into InfluxDB, a time-series database. 
 - **Anomaly Detection**: Consumes data from Kafka to detect anomalies at both constellation and satellite levels. Results are written to InfluxDB. 
 - **Grafana**: Visualizes telemetry data and anomalies, enabling users to explore trends and anomalies over time. 
@@ -20,6 +21,8 @@ flowchart TB
     A[Basilisk Simulation] -->|Generates Telemetry Data| B[PostgreSQL Database]
     B -->|Reads Historical Data| C[middleware.py]
     C -->|Streams Data| D[Kafka Cluster]
+    D -->|Consumes & Processes Data| I[CCSDS Ingest Service]
+    I -->|Translates CCSDS bytestreams| F[InfluxDB]
     D -->|Consumes & Processes Data| E[Telegraf]
     E -->|Writes Metrics| F[InfluxDB]
     D -->|Analyzes Anomalies| H[Anomaly Detection]
@@ -31,7 +34,9 @@ flowchart TB
 
 **From PostgreSQL to Kafka (middleware.py)**: The `middleware.py` script periodically reads data from PostgreSQL and streams it into Kafka. This transforms the static data into a real-time data feed, allowing downstream systems to process live telemetry.
 
-**From Kafka to InfluxDB (via Telegraf)**: Kafka, serving as a high-throughput messaging system, makes the telemetry data available to various consumers. Telegraf, configured as a Kafka consumer, ingests the telemetry data from Kafka and writes it into InfluxDB, a time-series database optimized for storing and querying time-stamped events.
+**From Kafka to InfluxDB (via Telegraf)**: Kafka, serving as a high-throughput messaging system, makes the telemetry data available to various consumers. Telegraf, configured as a Kafka consumer, ingests the telemetry data from Kafka and writes it into InfluxDB, a time-series database optimized for storing and querying time-stamped events. This is used for data written to the `telemetry` topic in Kafka, and is meant for the telemetry data that is not CCSDS bytestreams.
+
+**From Kafka to the CCSDS Ingest Service**: For operational deployments with real satellite telemetry, the CCSDS ingest service monitors a dedicated Kafka topic (`raw_telemetry`). It detects messages in the CCSDS byte format, parses them using a configurable schema, aggregates channels that arrive within a short time window, and writes the resulting row to InfluxDB. This ensures that both simulated JSON data and raw CCSDS streams can coexist and be processed by the anomaly detection and visualization systems.
 
 **From Kafka to Anomaly Detection**: In parallel, another consumer (the anomaly detection service) subscribes to the Kafka topic. It analyzes incoming data for anomalies at both the constellation and satellite levels. When it detects anomalies, it records the details back into InfluxDB for visualization and further analysis.
 
@@ -89,6 +94,28 @@ To return to the terminal, run:
 ```sql
 \q
 exit
+```
+
+### **ccsds-ingest**
+The CCSDS ingest service is designed to handle raw telemetry streams in the standard CCSDS byte format. It works as follows:
+
+- **Input**:
+The service consumes messages from a Kafka topic (e.g., raw_telemetry) that contain raw CCSDS byte streams.
+
+- **Detection & Parsing**:
+It checks if the incoming message is in the expected CCSDS format (by matching the packet length and header structure). The service then parses the header to extract fields such as version, satellite_id, packet_id, and (if available) a timestamp. The data field is parsed to extract individual channels (e.g., battery_voltage, battery_current, temperature) using offsets, lengths, and types defined in a configuration file (ccsds_config.json).
+
+- **Aggregation**:
+Since channels may update at different rates, the service aggregates channels that arrive within a configurable time window (for example, 1 second). All channels for the same satellite and within the time window are merged into a single JSON record.
+
+- **Output**:
+The parsed and aggregated data is written to InfluxDB in the correct format for the Influx database.
+
+You can look at the [sample configuration file](./ccsds-ingest-container/ccsds_config/sample_config.json) to see how the CCSDS byte streams are parsed. For a given bytestream, the configuration file specifies the offsets, lengths, and types of each channel. The service uses this information to extract the relevant data from the byte stream.
+
+#### Sample Telemetry Stream (Hexadecimal)
+```
+01 10 05 60 6F 8C 00 41 E6 66 66 40 4C CC CD 41 B4 00 00 AB CD
 ```
 
 ### **influx_telegraf**
