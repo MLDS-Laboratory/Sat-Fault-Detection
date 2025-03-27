@@ -1,3 +1,5 @@
+# REFERENCE: https://public.ccsds.org/Pubs/132x0b3.pdf
+
 import json
 import struct
 import time
@@ -137,7 +139,7 @@ def main():
         'auto.offset.reset': 'earliest'
     }
     consumer = Consumer(consumer_conf)
-    consumer.subscribe(['raw_telemetry'])  # Topic that has raw telemetry streams
+    consumer.subscribe(['raw_telemetry'])  # topic that has raw telemetry streams
 
     # Connect to InfluxDB - influx binds to port 8086 in its own Dockerfile
     influx_client = InfluxDBClient(host='influx_telegraf', port=8086, database='telemetry_db')
@@ -161,12 +163,16 @@ def main():
             if len(raw_bytes) == expected_packet_length:
                 parsed = parse_packet(raw_bytes)
                 if parsed:
+                    # Only store the translated/parsed version in the aggregation buffer
+                    # The original raw_bytes are not stored or sent to InfluxDB
                     aggregate_packet(parsed)
-
-                
+                    logger.info("Processed CCSDS packet and queued translated data for storage")
+                else:
+                    logger.warning("Failed to parse CCSDS packet, skipping")
             else:
                 # bypass: forward the message as-is or ignore.
                 logger.info("Received non-CCSDS stream - bypassing translation.")
+                # Note: We don't write non-CCSDS data to InfluxDB
 
             # Flush aggregated records at each iteration.
             flush_aggregated_packets(influx_client)
