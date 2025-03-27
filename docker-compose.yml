@@ -13,27 +13,20 @@ services:
       POSTGRES_DB: telemetry_db
     depends_on:
       - kafka
-    restart: always  # Ensures the container restarts on failure
+    restart: always
     networks:
       - telemetry-network
 
   kafka:
     image: bitnami/kafka:latest
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://:9092
+      # Required for KRaft mode:
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-    depends_on:
-      - zookeeper
-    restart: always
-    networks:
-      - telemetry-network
-
-  zookeeper:
-    image: bitnami/zookeeper:latest
-    environment:
-      ALLOW_ANONYMOUS_LOGIN: 'yes'
+      # Note: Remove KAFKA_ZOOKEEPER_CONNECT since it's not needed in KRaft mode.
     restart: always
     networks:
       - telemetry-network
@@ -75,7 +68,8 @@ services:
       - telemetry-network
 
 volumes:
-  influx_telegraf_data:
+  # removed volume for influx to avoid front-end persists, can be added back if helps
+#   influx_telegraf_data:
   pgdata:
 
 networks:
