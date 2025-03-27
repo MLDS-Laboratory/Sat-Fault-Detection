@@ -20,13 +20,13 @@ services:
   kafka:
     image: bitnami/kafka:latest
     environment:
-      # Required for KRaft mode:
-      KAFKA_CFG_PROCESS_ROLES: broker,controller
-      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: broker,controller        # Enable both broker and controller roles
+      KAFKA_CFG_NODE_ID: "1"                            # Unique ID for this Kafka node
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER   # Define the listener name that the controller should use
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"        # default quorum for a single node
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      # Note: Remove KAFKA_ZOOKEEPER_CONNECT since it's not needed in KRaft mode.
     restart: always
     networks:
       - telemetry-network
