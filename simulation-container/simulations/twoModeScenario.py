@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from utilities.flightModes import FlightModes
 
 #utilities and setup
 from Basilisk.architecture import messaging
@@ -230,10 +231,14 @@ def simulate(plot):
         satSim.AddModelToTask(simTaskName, rwTorqueLog[i])
     
 
-    satSim.initializeSimulation()
+    satSim.InitializeSimulation()
+
+    mode = FlightModes(satSim, "sunPoint", None, samplingTime, simTaskName, nav=nav, inertial=inertial, spice=spice)
 
     while satSim.TotalSim.CurrentNanos < simTime:
         satSim.TotalSim.SingleStepProcesses()
+        mode.modeManager(satSim.TotalSim.CurrentNanos)
+
     
     motorTorque = [rw.u_current for rw in rwTorqueLog]
     sigma  = np.array(satLog.sigma_BN)
@@ -269,5 +274,6 @@ def simulate(plot):
 
         plt.tight_layout()
         plt.show()
-    return satLog.times(), sigma, rwMotorLog.motorTorque[:, :3], motorTorque, faultLog
+    return satLog.times(), sigma, rwMotorLog.motorTorque[:, :3], motorTorque
 
+simulate(True)
