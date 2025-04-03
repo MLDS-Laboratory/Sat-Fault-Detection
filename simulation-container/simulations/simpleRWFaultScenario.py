@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import random
-from faults.rwfault import RWFault
+from utilities.rwfault import RWFault
 import psycopg2
 from psycopg2 import sql
 import json  
