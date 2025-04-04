@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from utilities.flightModes import FlightModes
+import sys
 
 #utilities and setup
 from Basilisk.architecture import messaging
@@ -18,10 +19,9 @@ from Basilisk.simulation import spacecraft
 from Basilisk.simulation import extForceTorque
 from Basilisk.simulation import simpleNav
 from Basilisk.fswAlgorithms import attTrackingError
-from Basilisk.fswAlgorithms import inertial3D
+from Basilisk.fswAlgorithms import inertial3D, attRefCorrection
 from Basilisk.fswAlgorithms import mrpFeedback
 from Basilisk.fswAlgorithms import rwMotorTorque
-
 #general sim
 from Basilisk.utilities import SimulationBaseClass
 
@@ -31,7 +31,7 @@ def simulate(plot):
     simProcessName = "mr. sim"
 
     satSim = SimulationBaseClass.SimBaseClass()
-    timestep = 5
+    timestep = 10
     dynamics = satSim.CreateNewProcess(simProcessName)
     simulationTimeStep = macros.sec2nano(timestep)
     dynamics.addTask(satSim.CreateNewTask(simTaskName, simulationTimeStep))
@@ -58,7 +58,7 @@ def simulate(plot):
     #ang velocity of body frame relative to inertial expressed in body frame coords
     satellite.hub.omega_BN_BInit = [[0.0], [0.0], [0.0]] 
 
-    satSim.AddModelToTask(simTaskName, satellite)
+    satSim.AddModelToTask(simTaskName, satellite, 15)
 
     #gravity stuff - 2BP
     gravity = simIncludeGravBody.gravBodyFactory()
@@ -83,7 +83,7 @@ def simulate(plot):
 
     oe.Omega = 0 #110 gets permanent illumination at i = 90
     oe.omega = 0 #90.0 * macros.D2R
-    oe.f = 0 #85.3  * macros.D2R
+    oe.f = 90 * macros.D2R #85.3  * macros.D2R
     rN, vN = orbitalMotion.elem2rv(earth.mu, oe)
     oe = orbitalMotion.rv2elem(earth.mu, rN, vN) #yea idk why this exists
 
@@ -96,7 +96,7 @@ def simulate(plot):
     #sim time
     n = np.sqrt(earth.mu / oe.a**3)
     period = 2. * np.pi / n
-    simTime = macros.sec2nano(1 * period)
+    simTime = macros.sec2nano(period)
 
     #navigation module
     nav = simpleNav.SimpleNav()
@@ -105,17 +105,27 @@ def simulate(plot):
     nav.scStateInMsg.subscribeTo(satellite.scStateOutMsg)
     nav.sunStateInMsg.subscribeTo(spice.planetStateOutMsgs[1])
 
-    #inertial reference attitude
-    inertial = inertial3D.inertial3D()
-    inertial.ModelTag = "inertial3D"
-    satSim.AddModelToTask(simTaskName, inertial)
-    inertial.sigma_R0N = [0., 0.5, 0.]
+    samplingTime = unitTestSupport.samplingTime(simTime, simulationTimeStep,\
+                                            simTime / simulationTimeStep)
+
+    modes = ["nadirPoint", "sunPoint"]
+    switches = [{"mode":"nadirPoint", "time":0.25}, {"mode":"sunPoint", "time":0.5}, {"mode":"nadirPoint", "time":0.75}]
+    mode = FlightModes(satSim, "sunPoint", switches, samplingTime, simTaskName, nav=nav, spice=spice)
+    
+    satSim.AddModelToTask(simTaskName, mode)
+
+    #extraneous but it works
+    correction = attRefCorrection.attRefCorrection()
+    correction.ModelTag = "correction"
+    correction.sigma_BcB = [0, 0, 0]
+    correction.attRefInMsg.subscribeTo(mode.attRef)
+    satSim.AddModelToTask(simTaskName, correction)
 
     #attitude error from reference
     attError = attTrackingError.attTrackingError()
     attError.ModelTag = "attErrorInertial3D"
     attError.attNavInMsg.subscribeTo(nav.attOutMsg)
-    attError.attRefInMsg.subscribeTo(inertial.attRefOutMsg)
+    attError.attRefInMsg.subscribeTo(correction.attRefOutMsg)
     satSim.AddModelToTask(simTaskName, attError)
 
 
@@ -204,11 +214,11 @@ def simulate(plot):
     rwMotor.rwParamsInMsg.subscribeTo(rwParamMsg)
     rwEffector.rwMotorCmdInMsg.subscribeTo(rwMotor.rwMotorTorqueOutMsg)
 
+
     """data collection"""
 
     #how often each logger samples
-    samplingTime = unitTestSupport.samplingTime(simTime, simulationTimeStep,\
-                                                simTime / simulationTimeStep)
+
     
     #true satellite states (translational and rotational position/velocity)
     satLog = satellite.scStateOutMsg.recorder(samplingTime)
@@ -233,11 +243,25 @@ def simulate(plot):
 
     satSim.InitializeSimulation()
 
-    mode = FlightModes(satSim, "sunPoint", None, samplingTime, simTaskName, nav=nav, inertial=inertial, spice=spice)
+    modePlot = []
 
-    while satSim.TotalSim.CurrentNanos < simTime:
+    satSim.TotalSim.SingleStepProcesses()
+    satSim.ConfigureStopTime(simTime)
+    satSim.ExecuteSimulation()
+    #mode.modeManager(satSim.TotalSim.CurrentNanos / simTime)
+    """
+    for i in switches:
+         satSim.ConfigureStopTime(i["time"] * macros.sec2nano(period))
+         satSim.ExecuteSimulation()
+         mode.modeManager(i["time"] * macros.sec2nano(period) + 1)
+         if satSim.TotalSim.CurrentNanos / simTime > 1:
+              break
+    """
+    """
+    while satSim.TotalSim.CurrentNanos  < simTime:
         satSim.TotalSim.SingleStepProcesses()
-        mode.modeManager(satSim.TotalSim.CurrentNanos)
+        #mode.modeManager(satSim.TotalSim.CurrentNanos / simTime)
+        print(satSim.TotalSim.CurrentNanos / simTime)"""
 
     
     motorTorque = [rw.u_current for rw in rwTorqueLog]
@@ -271,7 +295,10 @@ def simulate(plot):
         plt.xlabel("Time [orbits]")
         plt.ylabel("Torque [N-m]")
         plt.ylim(-0.22, 0.22)
-
+        """
+        plt.figure(4)
+        plt.plot(satLog.times() / period, modePlot)
+        """
         plt.tight_layout()
         plt.show()
     return satLog.times(), sigma, rwMotorLog.motorTorque[:, :3], motorTorque
