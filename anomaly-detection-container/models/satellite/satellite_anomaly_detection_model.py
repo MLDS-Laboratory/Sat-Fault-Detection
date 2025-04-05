@@ -46,3 +46,8 @@ class SatelliteAnomalyDetectionModel(ABC):
         Load or initialize the satellite-specific model. This method can be used to load pre-trained models.
         """
         pass
+
+    @abstractmethod
+    def save_model(self, model_path: str):
+        """Persist model weights or parameters."""
+        pass

@@ -19,22 +19,18 @@ class ConstellationAnomalyDetectionModel(ABC):
     """
 
     @abstractmethod
-    def detect(self, data) -> tuple[bool, AnomalyDetails]:
+    def detect(self, time, satellite_id, data) -> tuple[bool, list[AnomalyDetails]]:
         """
         Process incoming data and detect anomalies at the constellation level.
 
         Parameters:
-            data (dict): A dictionary containing telemetry data. Data format:
-            {
-                'time': number,
-                'satellite_id': number,
-                'data': dict
-            }
-            Since data comes in one satellite at a time, this class will need to track the satellites together.
+            time (int): The time of the data point.
+            satellite_id (int): The ID of the satellite.
+            data (dict): A dictionary containing the telemetry data from any channels at this timestep.
 
         Returns:
             bool: True if anomaly is detected, False otherwise.
-            dict: Details of the anomaly if detected.
+            list[AnomalyDetails]: Details of the anomaly (or multiple anomalies) if detected. Otherwise, return None.
         """
         pass
 
@@ -43,4 +39,9 @@ class ConstellationAnomalyDetectionModel(ABC):
         """
         Load or initialize the model. This method can be used to load pre-trained models.
         """
+        pass
+
+    @abstractmethod
+    def save_model(self, model_path: str):
+        """Persist model weights or parameters."""
         pass
