@@ -27,16 +27,18 @@ class SatelliteAnomalyDetectionModel(ABC):
         self.load_model()
 
     @abstractmethod
-    def detect(self, data) -> tuple[bool, AnomalyDetails]:
+    def detect(self, time, satellite_id, data) -> tuple[bool, list[AnomalyDetails]]:
         """
         Process incoming data for a specific satellite and detect anomalies.
 
         Parameters:
-            data (dict): A dictionary containing telemetry data for a single satellite.
+            time (int): The time of the data point.
+            satellite_id (int): The ID of the satellite.
+            data (dict): A dictionary containing the telemetry data from any channels at this timestep.
 
         Returns:
-            bool: True if an anomaly is detected, False otherwise.
-            AnomalyDetails: Details of the anomaly if detected. Otherwise, return None.
+            bool: True if anomaly is detected, False otherwise.
+            list[AnomalyDetails]: Details of the anomaly (or multiple anomalies) if detected. Otherwise, return None.
         """
         pass
 
