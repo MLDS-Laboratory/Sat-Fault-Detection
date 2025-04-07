@@ -110,7 +110,7 @@ def simulate(plot):
 
     modes = ["nadirPoint", "sunPoint"]
     switches = [{"mode":"nadirPoint", "time":0.25}, {"mode":"sunPoint", "time":0.5}, {"mode":"nadirPoint", "time":0.75}]
-    mode = FlightModes(satSim, "sunPoint", switches, samplingTime, simTaskName, nav=nav, spice=spice)
+    mode = FlightModes(satSim, "sunPoint", switches, samplingTime, simTaskName, period, nav=nav, spice=spice)
     
     satSim.AddModelToTask(simTaskName, mode)
 
@@ -239,34 +239,28 @@ def simulate(plot):
     for i in range(numRW):
         rwTorqueLog.append(rwEffector.rwOutMsgs[i].recorder(samplingTime))
         satSim.AddModelToTask(simTaskName, rwTorqueLog[i])
-    
+        
+
+    modeLog = mode.logger("currentMode")
+    satSim.AddModelToTask(simTaskName, modeLog)
 
     satSim.InitializeSimulation()
-
-    modePlot = []
 
     satSim.TotalSim.SingleStepProcesses()
     satSim.ConfigureStopTime(simTime)
     satSim.ExecuteSimulation()
-    #mode.modeManager(satSim.TotalSim.CurrentNanos / simTime)
-    """
-    for i in switches:
-         satSim.ConfigureStopTime(i["time"] * macros.sec2nano(period))
-         satSim.ExecuteSimulation()
-         mode.modeManager(i["time"] * macros.sec2nano(period) + 1)
-         if satSim.TotalSim.CurrentNanos / simTime > 1:
-              break
-    """
-    """
-    while satSim.TotalSim.CurrentNanos  < simTime:
-        satSim.TotalSim.SingleStepProcesses()
-        #mode.modeManager(satSim.TotalSim.CurrentNanos / simTime)
-        print(satSim.TotalSim.CurrentNanos / simTime)"""
 
     
     motorTorque = [rw.u_current for rw in rwTorqueLog]
     sigma  = np.array(satLog.sigma_BN)
 
+    pseudofaults = []
+    for i in range(len(modeLog.currentMode)):
+        if modeLog.currentMode[i] != modeLog.currentMode[i-1]:
+            pseudofaults.append(1)
+        else:
+            pseudofaults.append(0)
+    
     if plot:
         plt.figure(1)
         
@@ -295,12 +289,17 @@ def simulate(plot):
         plt.xlabel("Time [orbits]")
         plt.ylabel("Torque [N-m]")
         plt.ylim(-0.22, 0.22)
-        """
+        
         plt.figure(4)
-        plt.plot(satLog.times() / period, modePlot)
-        """
+        plt.title("Pseudo-Faults - Mode Changes")
+        plt.xlabel("Time [orbits]")
+        plt.ylabel("Fault Status")
+        plt.plot(satLog.times() / period, pseudofaults)
+        
         plt.tight_layout()
         plt.show()
-    return satLog.times(), sigma, rwMotorLog.motorTorque[:, :3], motorTorque
+    return satLog.times(), sigma, rwMotorLog.motorTorque[:, :3], motorTorque, pseudofaults
 
-simulate(True)
+if __name__ == "__main__":
+    #plot?
+    simulate(False)

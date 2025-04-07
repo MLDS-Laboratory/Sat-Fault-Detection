@@ -1,12 +1,12 @@
-from Basilisk.utilities import RigidBodyKinematics as rbk
+from Basilisk.utilities import RigidBodyKinematics as rbk, macros
 from Basilisk.architecture import sysModel, messaging
 import sys
 import numpy as np
 
 class FlightModes(sysModel.SysModel):
-    def __init__(self, sim, startMode, switches : list[dict], samplingTime, taskName, **kwargs):
+    def __init__(self, sim, startMode, switches : list[dict], samplingTime, taskName, period, **kwargs):
         super().__init__()
-        
+        self.period = macros.sec2nano(period)
         self.switches = switches
         self.currentMode = startMode
         nav = kwargs.get("nav")
@@ -31,14 +31,15 @@ class FlightModes(sysModel.SysModel):
         buffer.omega_RN_N = [0, 0, 0]
         buffer.domega_RN_N = [0, 0, 0]
         self.attRef.write(buffer, CurrentSimNanos, self.moduleID)
-        pass
     def modeManager(self, currentTime):
-        time = currentTime / 5828516680091.
-        print(time)
-        if self.switches and self.switches[0]["time"] < time:
+        if self.switches and self.switches[0]["time"] < currentTime / self.period:
             self.currentMode = self.switches[0]["mode"]
             self.switches = self.switches[1:]
-        return eval("self." + self.currentMode)()
+        try:
+            orientation = eval("self." + self.currentMode)()
+        except:
+            raise NameError(self.currentMode + " is not yet a supported flight mode.")
+        return orientation
     def sunPoint(self):
         try:
             DCM = rbk.MRP2C(self.navAttLog.sigma_BN[-1])
