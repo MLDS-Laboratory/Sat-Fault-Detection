@@ -14,7 +14,7 @@ class ConstellationOutlierDetection(ConstellationAnomalyDetectionModel):
         """
         self.std_threshold = std_threshold
         self.window = window_seconds
-        
+
         # A dictionary to store history of readings for each channel.
         # Keys are channel names; values are lists of tuples (time, value).
         self.channel_history = {}
@@ -92,3 +92,7 @@ class ConstellationOutlierDetection(ConstellationAnomalyDetectionModel):
         if anomalies:
             return True, anomalies
         return False, []
+
+
+    def save_model(self, model_path: str):
+        pass

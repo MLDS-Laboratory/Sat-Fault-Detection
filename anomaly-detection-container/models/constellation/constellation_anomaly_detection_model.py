@@ -19,7 +19,7 @@ class ConstellationAnomalyDetectionModel(ABC):
     """
 
     @abstractmethod
-    def detect(self, time, satellite_id, data) -> tuple[bool, list[AnomalyDetails]]:
+    def detect(self, time, satellite_id, data) -> tuple[bool, list[AnomalyDetails] | None]:
         """
         Process incoming data and detect anomalies at the constellation level.
 

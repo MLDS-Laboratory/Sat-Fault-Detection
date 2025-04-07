@@ -27,7 +27,7 @@ class SatelliteAnomalyDetectionModel(ABC):
         self.load_model()
 
     @abstractmethod
-    def detect(self, time, satellite_id, data) -> tuple[bool, list[AnomalyDetails]]:
+    def detect(self, time, satellite_id, data) -> tuple[bool, list[AnomalyDetails] | None]:
         """
         Process incoming data for a specific satellite and detect anomalies.
 

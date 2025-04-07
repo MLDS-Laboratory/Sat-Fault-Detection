@@ -140,3 +140,7 @@ class OutlierDetectionModel(SatelliteAnomalyDetectionModel):
             self.anomaly_start[field_name] = None  # Reset the anomaly start time
         
         return None
+    
+
+    def save_model(self, model_path: str):
+        pass
