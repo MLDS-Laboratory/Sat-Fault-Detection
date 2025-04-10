@@ -3,3 +3,8 @@ psycopg2-binary
 influxdb
 numpy
 kagglehub
+torch
+torchvision
+pandas
+scikit-learn
+scipy
