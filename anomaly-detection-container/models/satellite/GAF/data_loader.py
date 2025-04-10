@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 import numpy as np
 from PIL import Image
@@ -86,5 +85,5 @@ class OpsSatGAFDataset(Dataset):
         img = img.convert("RGB")
         if self.transform:
             img = self.transform(img)
-            
+
         return img, label
