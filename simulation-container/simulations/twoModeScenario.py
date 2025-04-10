@@ -96,7 +96,8 @@ def simulate(plot):
     #sim time
     n = np.sqrt(earth.mu / oe.a**3)
     period = 2. * np.pi / n
-    simTime = macros.sec2nano(period)
+    orbits = 2
+    simTime = macros.sec2nano(orbits * period)
 
     #navigation module
     nav = simpleNav.SimpleNav()
@@ -108,8 +109,10 @@ def simulate(plot):
     samplingTime = unitTestSupport.samplingTime(simTime, simulationTimeStep,\
                                             simTime / simulationTimeStep)
 
-    modes = ["nadirPoint", "sunPoint"]
-    switches = [{"mode":"nadirPoint", "time":0.25}, {"mode":"sunPoint", "time":0.5}, {"mode":"nadirPoint", "time":0.75}]
+    modes = ["sunPoint", "nadirPoint"]
+    interval = 1./4.
+    switches = [{"mode":modes[i % 2], "time":i * interval} for i in range(1, int(orbits / interval) + 1)]
+    #switches = [{"mode":"nadirPoint", "time":0.25}, {"mode":"sunPoint", "time":0.5}, {"mode":"nadirPoint", "time":0.75}]
     mode = FlightModes(satSim, "sunPoint", switches, samplingTime, simTaskName, period, nav=nav, spice=spice)
     
     satSim.AddModelToTask(simTaskName, mode)
@@ -152,9 +155,9 @@ def simulate(plot):
     """
     maxMomentum = 100.
     defaults = [
-         {"axis":[1, 0, 0], "u_max":0.2, "type":"Honeywell_HR16"},
-         {"axis":[0, 1, 0], "u_max":0.2, "type":"Honeywell_HR16"},
-         {"axis":[0, 0, 1], "u_max":0.2, "type":"Honeywell_HR16"},
+         {"axis":[1, 0, 0], "u_max":1., "type":"Honeywell_HR16"},
+         {"axis":[0, 1, 0], "u_max":1., "type":"Honeywell_HR16"},
+         {"axis":[0, 0, 1], "u_max":1., "type":"Honeywell_HR16"},
     ]
     
     for i in range(len(defaults)):
@@ -244,6 +247,8 @@ def simulate(plot):
     modeLog = mode.logger("currentMode")
     satSim.AddModelToTask(simTaskName, modeLog)
 
+    satSim.SetProgressBar(True)
+
     satSim.InitializeSimulation()
 
     satSim.TotalSim.SingleStepProcesses()
@@ -254,9 +259,10 @@ def simulate(plot):
     motorTorque = [rw.u_current for rw in rwTorqueLog]
     sigma  = np.array(satLog.sigma_BN)
 
+    buffer = 30
     pseudofaults = []
     for i in range(len(modeLog.currentMode)):
-        if modeLog.currentMode[i] != modeLog.currentMode[i-1]:
+        if modeLog.currentMode[i] != modeLog.currentMode[i-buffer]:
             pseudofaults.append(1)
         else:
             pseudofaults.append(0)
@@ -298,8 +304,8 @@ def simulate(plot):
         
         plt.tight_layout()
         plt.show()
-    return satLog.times(), sigma, rwMotorLog.motorTorque[:, :3], motorTorque, pseudofaults
+    return satLog.times() / period, sigma, rwMotorLog.motorTorque[:, :3], motorTorque, pseudofaults
 
 if __name__ == "__main__":
     #plot?
-    simulate(False)
+    simulate(True)
