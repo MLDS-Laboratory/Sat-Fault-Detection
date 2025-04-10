@@ -12,8 +12,8 @@ from torch.utils.data import Subset
 
 def main():
     # file paths for the OPS-SAT dataset
-    dataset_csv = os.path.join("data", "OPS-SAT", "dataset.csv")
-    segment_csv = os.path.join("data", "OPS-SAT", "segment.csv")
+    dataset_csv = "C:\\Users\\varun\\Documents\\UMD\\Research\\MLDS\\Sat-Fault-Detection\\anomaly-detection-container\\data\\OPS-SAT\\dataset.csv"
+    segment_csv = "C:\\Users\\varun\\Documents\\UMD\\Research\\MLDS\\Sat-Fault-Detection\\anomaly-detection-container\\data\\OPS-SAT\\segments.csv"
     
     # load data using OpsSatDataLoader
     data_loader = OpsSatDataLoader(dataset_csv, segment_csv)
