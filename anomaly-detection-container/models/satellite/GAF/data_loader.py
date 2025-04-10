@@ -27,9 +27,8 @@ class OpsSatDataLoader:
         for seg, group in grouped:
             group = group.sort_values('timestamp')
             ts = group['value'].values.astype(np.float32)
-            label = group['label'].iloc[0]
-            # Convert label to binary (assume "anomaly" equals anomalous)
-            binary_label = 1 if label.lower() == "anomaly" else 0
+            anomaly_flag = int(group['anomaly'].iloc[0])
+
             channel = group['channel'].iloc[0]
             sampling = group['sampling'].iloc[0]
             train_flag = group['train'].iloc[0]
@@ -37,7 +36,7 @@ class OpsSatDataLoader:
                 'segment': seg,
                 'channel': channel,
                 'ts': ts,
-                'label': binary_label,
+                'label': anomaly_flag,
                 'sampling': sampling,
                 'train': train_flag
             })
