@@ -1,8 +1,5 @@
-import torch
 import torch.nn as nn
-import torch.optim as optim
-from torchvision import models
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+
 
 class CNNFromScratch(nn.Module):
     """

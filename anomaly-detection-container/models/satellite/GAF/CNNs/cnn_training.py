@@ -49,7 +49,7 @@ class ModelTrainer:
 
                     # track the stats
                     running_loss += loss.item() * inputs.size(0)
-                    all_preds.extend(preds.cpu().numpy())
+                    all_preds.extend(preds.cpu().numpy())            # move to cpu for numpy & scikit to use it
                     all_labels.extend(labels.cpu().numpy())
 
                 # calculate epoch loss and accuracy
