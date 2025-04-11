@@ -3,6 +3,9 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from gaf_transform import compute_gaf  
+import matplotlib.pyplot as plt
+import argparse
+import os
 
 class OpsSatDataLoader:
     """
@@ -87,3 +90,58 @@ class OpsSatGAFDataset(Dataset):
             img = self.transform(img)
 
         return img, label
+
+if __name__ == "__main__":
+    dataset_csv = "C:\\Users\\varun\\Documents\\UMD\\Research\\MLDS\\Sat-Fault-Detection\\anomaly-detection-container\\data\\OPS-SAT\\dataset.csv"
+    segment_csv = "C:\\Users\\varun\\Documents\\UMD\\Research\\MLDS\\Sat-Fault-Detection\\anomaly-detection-container\\data\\OPS-SAT\\segments.csv"
+    
+    segment_idx = 0  # Default segment index to display
+
+    # Print paths to help with debugging
+    print(f"Loading dataset from: {dataset_csv}")
+    print(f"Loading segments from: {segment_csv}")
+    
+    # Load data
+    data_loader = OpsSatDataLoader(dataset_csv, segment_csv)
+    train_segments, test_segments = data_loader.get_train_test_segments()
+    
+    # Combine segments for full range of indices
+    all_segments = train_segments + test_segments
+    
+    if segment_idx < 0 or segment_idx >= len(all_segments):
+        print(f"Error: segment_idx must be between 0 and {len(all_segments)-1}")
+        exit(1)
+    
+    # get segment and create GAF image
+    segment = all_segments[segment_idx]
+    ts = segment['ts']
+    label = segment['label']
+    label_str = "Anomaly" if label == 1 else "Normal"
+    channel = segment['channel']
+    
+    plt.figure(figsize=(12, 6))
+    
+    # Plot original time series
+    plt.subplot(1, 2, 1)
+    plt.plot(ts)
+    plt.title(f"Original Time Series\nSegment {segment['segment']}, Channel: {channel}")
+    plt.xlabel("Time")
+    plt.ylabel("Value")
+    
+    # Compute and display GAF
+    gaf_img = compute_gaf(ts)
+    
+    # Normalize for visualization
+    gaf_img = (gaf_img - gaf_img.min()) / (gaf_img.max() - gaf_img.min() + 1e-8)
+    
+    plt.subplot(1, 2, 2)
+    plt.imshow(gaf_img, cmap='viridis')
+    plt.colorbar()
+    plt.title(f"GAF Image - Label: {label_str}")
+    plt.tight_layout()
+    
+    print(f"Displaying segment {segment_idx} - ID: {segment['segment']}")
+    print(f"Channel: {channel}, Label: {label_str}, Sampling: {segment['sampling']}")
+    print(f"Time series length: {len(ts)}")
+    
+    plt.show()

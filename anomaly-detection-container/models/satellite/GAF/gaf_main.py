@@ -62,12 +62,12 @@ def main():
     criterion = torch.nn.CrossEntropyLoss()
     
     # scratch architecture
-    # model = CNNFromScratch(num_classes=2, input_size=224)
-    # optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    model = CNNFromScratch(num_classes=2, input_size=224)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # pretrained resnet architecture
-    model = get_pretrained_resnet(num_classes=2, freeze_early=True)
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
+    # model = get_pretrained_resnet(num_classes=2, freeze_early=True)
+    # optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
     
     # initialize the trainer and run training
     trainer = ModelTrainer(model, dataloaders, criterion, optimizer, device)
