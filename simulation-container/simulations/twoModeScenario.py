@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from utilities.flightModes import FlightModes
+from utilities.pointingModes import PointingModes
 import sys
 
 #utilities and setup
@@ -113,7 +113,7 @@ def simulate(plot):
     interval = 1./4.
     switches = [{"mode":modes[i % 2], "time":i * interval} for i in range(1, int(orbits / interval) + 1)]
     #switches = [{"mode":"nadirPoint", "time":0.25}, {"mode":"sunPoint", "time":0.5}, {"mode":"nadirPoint", "time":0.75}]
-    mode = FlightModes(satSim, "sunPoint", switches, samplingTime, simTaskName, period, nav=nav, spice=spice)
+    mode = PointingModes(satSim, "sunPoint", switches, samplingTime, simTaskName, period, nav=nav, spice=spice)
     
     satSim.AddModelToTask(simTaskName, mode)
 

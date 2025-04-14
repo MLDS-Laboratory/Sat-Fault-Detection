@@ -3,7 +3,7 @@ from Basilisk.architecture import sysModel, messaging
 import sys
 import numpy as np
 
-class FlightModes(sysModel.SysModel):
+class PointingModes(sysModel.SysModel):
     def __init__(self, sim, startMode, switches : list[dict], samplingTime, taskName, period, **kwargs):
         super().__init__()
         self.period = macros.sec2nano(period)
