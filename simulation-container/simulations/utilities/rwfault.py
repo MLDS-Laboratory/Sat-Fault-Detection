@@ -1,4 +1,4 @@
-from faults.fault import Fault
+from utilities.fault import Fault
 from collections.abc import Collection
 from collections import OrderedDict
 from typing import Any

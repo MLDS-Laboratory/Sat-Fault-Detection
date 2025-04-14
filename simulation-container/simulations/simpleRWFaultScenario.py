@@ -356,7 +356,8 @@ def run(plot, simulation_id):
     conn.close()
 
 if __name__ == "__main__":
-    run(False, simulation_id=3192025)
+    #run(False, simulation_id=3192025)
+    simulate(True)
 
 
 
