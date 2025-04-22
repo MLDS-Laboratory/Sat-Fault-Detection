@@ -2,3 +2,4 @@ kafka-python
 psycopg2-binary
 influxdb
 numpy
+kagglehub

@@ -144,7 +144,10 @@ class AnomalyDetectionManager:
         # Process constellation-level anomalies
         for model in self.constellation_models:
             try:
-                is_anomaly, details = model.detect(data)
+                timestep = data.get('time', 0)
+                this_satellite_id = data.get('satellite_id', 0)
+                channel_data = data.get('data', {})
+                is_anomaly, details = model.detect(timestep, this_satellite_id, channel_data)
                 if is_anomaly:
                     # details could be a list of anomalies
                     if isinstance(details.get('anomalies'), list):
@@ -161,7 +164,10 @@ class AnomalyDetectionManager:
                 try:
                     logging.info(f"Processing satellite-specific anomalies for satellite {satellite_id} with model {model_name}")
                     logging.info(f"Data: {data}")
-                    is_anomaly, details = model.detect(data)
+                    timestep = data.get('time', 0)
+                    channel_data = data.get('data', {})
+                    satellite_id = data.get('satellite_id', 0)
+                    is_anomaly, details = model.detect(timestep, satellite_id, channel_data)
                     if is_anomaly:
                         self.record_anomaly(details, True)
                 except Exception as e:
