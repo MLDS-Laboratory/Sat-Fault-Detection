@@ -6,14 +6,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os
+#weirdness occurred when i didn't have this
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
 sys.path.append(parent_dir)
-import twoModeScenario as sc
+import twoModeScenario as sc #this test is currently setup to run twoModeScenario, which only has pseudofaults
+
+#run the simulation, combine the data per timestep
 times, sigma, torque_desired, torque_actual, faults = sc.simulate(False)
 torque_actual = np.array(torque_actual)
 times = times / np.pow(10, 9)
 features = []
 for i in range(len(times)):
+    #note that the time is included here but not passed into the classifier
+    #it's only included here to make it easier to find the specific timestep being explained
+    #since train_test_split changes the order
+
+    #on a LIME-interested note, these values are absolute-valued because LIME's output was nonsensical otherwise. 
+    #and that makes sense, because what's really the difference to it between a negative and positive torque?
     features.append([times[i]])
     features[i].extend(abs(sigma[i]))
     features[i].extend(abs(torque_desired[i]))
@@ -22,10 +31,7 @@ for i in range(len(times)):
 features = np.array(features)
 labels = faults
 
-#size = 100
-#data = np.ones(int(size/10))
-#features = np.array([[x * i for x in data] for i in range(size)])
-#labels = np.array([1 if i > size/2 else 0 for i in range(size)])
+#train and test sets, naming features and labels
 train, test, labels_train, labels_test = sklearn.model_selection.train_test_split(features, labels, train_size=0.80)
 train = np.array(train)
 test = np.array(test)
@@ -35,18 +41,28 @@ feature_names = np.array(["sigma_x", "sigma_y", "sigma_z", "td_1", "td_2", "td_3
 class_names = np.array(["No Fault", "Fault"])
 
 
+#training the classifier and getting results
+#note from here on out that the datasets passed in are indexed [1:] to exclude time
 rf = ensemble.RandomForestClassifier(n_estimators=500)
 rf.fit(train[:, 1:], labels_train)
 labels_pred = rf.predict(test[:, 1:])
 print(f"Random Forest Prediction Accuracy: \n{sklearn.metrics.classification_report(labels_test, labels_pred)}")
 
+
+#LIME!!!! passing all instances
 explainer = lime.lime_tabular.LimeTabularExplainer(train[:, 1:], 
                                                    feature_names=feature_names, 
                                                    class_names=class_names, 
                                                    discretize_continuous=False)
+
+#generating a random timestep for LIME to explain
 trues = [i for i in range(len(labels_pred)) if labels_pred[i] == 1]
 j = np.random.choice(trues, 1)[0]
+#CLASSIFIER MUST HAVE A PROBABILITY IN ITS PREDICTION
+#top_labels tells it how many labels to explain, in order from most to least likely
 exp = explainer.explain_instance(test[j, 1:], rf.predict_proba, num_features=len(feature_names), top_labels=len(class_names))
+
+#outputs
 print(f"Observation Explained:")
 print(f"time: {test[j][0]}")
 for i in range(len(feature_names)):
@@ -57,6 +73,9 @@ print(f"LIME model bias for predicted class: {exp.intercept[0]}")
 print(f"LIME model bias for other class: {exp.intercept[1]}")
 print(f"R^2 of LIME's local linear model: {exp.score}")
 
+
+#this is just to make it easier to see which instance is being explained. it will only work for twoModeScenario, 
+#and will have to be customized for all others, obviously
 plt.figure(1)
 #mrpFeedback Desired Torque Outputs
 torque_desired = np.array(torque_desired)

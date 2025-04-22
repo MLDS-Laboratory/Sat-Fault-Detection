@@ -22,6 +22,7 @@ from Basilisk.fswAlgorithms import attTrackingError
 from Basilisk.fswAlgorithms import inertial3D, attRefCorrection
 from Basilisk.fswAlgorithms import mrpFeedback
 from Basilisk.fswAlgorithms import rwMotorTorque
+
 #general sim
 from Basilisk.utilities import SimulationBaseClass
 
@@ -99,25 +100,35 @@ def simulate(plot):
     orbits = 2
     simTime = macros.sec2nano(orbits * period)
 
-    #navigation module
+    #navigation module - typically used to add noise; i'm using it for state messages
     nav = simpleNav.SimpleNav()
     nav.ModelTag = "navigation"
     satSim.AddModelToTask(simTaskName, nav)
     nav.scStateInMsg.subscribeTo(satellite.scStateOutMsg)
     nav.sunStateInMsg.subscribeTo(spice.planetStateOutMsgs[1])
 
+    #when to sample data
     samplingTime = unitTestSupport.samplingTime(simTime, simulationTimeStep,\
                                             simTime / simulationTimeStep)
 
+    """
+    This sets up the mode switches. The two modes that are implemented are sun-pointing and modified nadir-pointing (x-axis
+    towards Earth). 
+
+    'switches' tells the module when to switch modes and what to switch to.
+
+    PointingModes requires the sim, starting mode, switch array, sampling time, sim task name, orbital period, 
+    and the simpleNav and Spice modules. It also outputs a desired attitude reference, replacing inertial3D.  
+    """
     modes = ["sunPoint", "nadirPoint"]
     interval = 1./4.
     switches = [{"mode":modes[i % 2], "time":i * interval} for i in range(1, int(orbits / interval) + 1)]
-    #switches = [{"mode":"nadirPoint", "time":0.25}, {"mode":"sunPoint", "time":0.5}, {"mode":"nadirPoint", "time":0.75}]
     mode = PointingModes(satSim, "sunPoint", switches, samplingTime, simTaskName, period, nav=nav, spice=spice)
     
     satSim.AddModelToTask(simTaskName, mode)
 
-    #extraneous but it works
+    #extraneous but it works - essentially acts as a bridge between modes and attError.
+    #technically supposed to add a fixed offset to the reference attitude. 
     correction = attRefCorrection.attRefCorrection()
     correction.ModelTag = "correction"
     correction.sigma_BcB = [0, 0, 0]
@@ -243,10 +254,13 @@ def simulate(plot):
         rwTorqueLog.append(rwEffector.rwOutMsgs[i].recorder(samplingTime))
         satSim.AddModelToTask(simTaskName, rwTorqueLog[i])
         
-
+    #logs the mode at teach timestep, which is an attribute within PointingModes, not its own message,
+    #and therefore can't use a recorder
     modeLog = mode.logger("currentMode")
     satSim.AddModelToTask(simTaskName, modeLog)
 
+
+    """SIM"""
     satSim.SetProgressBar(True)
 
     satSim.InitializeSimulation()
@@ -255,10 +269,13 @@ def simulate(plot):
     satSim.ConfigureStopTime(simTime)
     satSim.ExecuteSimulation()
 
-    
+    #extract motor torques at all timesteps
     motorTorque = [rw.u_current for rw in rwTorqueLog]
+
+
     sigma  = np.array(satLog.sigma_BN)
 
+    #define pseudofaults as having changed mode within the last ~buffer~ timesteps
     buffer = 30
     pseudofaults = []
     for i in range(len(modeLog.currentMode)):
@@ -267,6 +284,7 @@ def simulate(plot):
         else:
             pseudofaults.append(0)
     
+    """PLOTTING"""
     if plot:
         plt.figure(1)
         
