@@ -59,7 +59,7 @@ class SensorSunPos(sysModel.SysModel):
             else:
                 self.sensedSun = self.inertial.sigma_R0N
 
-def simulate(plot):
+def simulate(plot, CSSsun):
     #a bunch of initializations
     simTaskName = "sim city"
     simProcessName = "mr. sim"
@@ -88,9 +88,9 @@ def simulate(plot):
     #adding inertia to the objectsatellite
     satellite.hub.IHubPntBc_B = unitTestSupport.np2EigenMatrix3d(inertia) 
     #orientation of body frame relative to inertial
-    satellite.hub.sigma_BNInit = rbk.euler3212MRP([0, 0, 0])
+    satellite.hub.sigma_BNInit = rbk.euler3212MRP([0, 1, 0])
     #ang velocity of body frame relative to inertial expressed in body frame coords
-    satellite.hub.omega_BN_BInit = [[0.0], [0.0], [0.0]] 
+    satellite.hub.omega_BN_BInit = [[0.01/ np.sqrt(3)], [-0.01 / np.sqrt(3)], [0.01 / np.sqrt(3)]]
 
     satSim.AddModelToTask(simTaskName, satellite)
 
@@ -157,7 +157,8 @@ def simulate(plot):
     control = mrpFeedback.mrpFeedback()
     
     control.ModelTag = "mrpFeedback"
-    satSim.AddModelToTask(simTaskName, control)
+    if CSSsun:
+        satSim.AddModelToTask(simTaskName, control)
     #parameters taken from scenarioAttitudeFeedbackRW
     control.K = 3.5
     control.Ki = -1 #negative turns integral control off
@@ -165,10 +166,12 @@ def simulate(plot):
     control.integralLimit = 2. / control.Ki * 0.1
 
     #external torque
-    ext = extForceTorque.ExtForceTorque()
-    satellite.addDynamicEffector(ext)
-    satSim.AddModelToTask(simTaskName, ext)
-    ext.cmdTorqueInMsg.subscribeTo(control.cmdTorqueOutMsg)
+    
+    if CSSsun:
+        ext = extForceTorque.ExtForceTorque()
+        satellite.addDynamicEffector(ext)
+        satSim.AddModelToTask(simTaskName, ext)
+        ext.cmdTorqueInMsg.subscribeTo(control.cmdTorqueOutMsg)
 
     #some final module subscriptions
     
@@ -194,7 +197,8 @@ def simulate(plot):
 
     sensors = []
     loggers = []
-    for i in range(18):
+    numCSS = 18
+    for i in range(numCSS):
         sensors.append(coarseSunSensor.CoarseSunSensor())
         setup(sensors[i])
         #sensors[i].senNoiseStd = i/500
@@ -217,18 +221,19 @@ def simulate(plot):
     sensors[15].nHat_B = np.array([0.0, 0.0, -1.0])
     sensors[16].nHat_B = np.array([0.0, 0.0, -1.0])
     sensors[17].nHat_B = np.array([0.0, 0.0, -1.0])
-    for i in range(18):
+    for i in range(numCSS):
         sensors[i].r_B = sensors[i].nHat_B
 
     #how often each logger samples
     samplingTime = unitTestSupport.samplingTime(simTime, simulationTimeStep,\
                                                 simTime / simulationTimeStep)
 
-    cssfault = CSSfault(sensors)
+    cssfault = CSSfault(sensors, chance=0.0001)
     satSim.AddModelToTask(simTaskName, cssfault)
 
     senseSun = SensorSunPos(satSim, samplingTime, simTaskName, sensors, nav, inertial)
-    satSim.AddModelToTask(simTaskName, senseSun)
+    if CSSsun:
+        satSim.AddModelToTask(simTaskName, senseSun)
 
     """data collection"""
 
@@ -284,6 +289,8 @@ def simulate(plot):
 
     sigma  = np.array(satLog.sigma_BN)
 
+    faults = np.array(faults.faultState)
+
     """PLOTTING"""
     if plot:
         plt.close("all")
@@ -302,29 +309,30 @@ def simulate(plot):
 
         #CSS sensor values, biases included
         plt.figure(2, figsize=(20,len(CSSdata) / 2))
+        colors = plt.cm.tab20.colors[:len(CSSdata)]
         timeAxis = loggers[0].times()
         for i in range(len(CSSdata)):
             plt.subplot(int(len(CSSdata) / 6), 6, i+1)
             plt.plot(timeAxis * macros.NANO2SEC / period, CSSdata[i],
-                     color=unitTestSupport.getLineColor(i, len(CSSdata)))
+                     color=colors[i])
             plt.title(f'$CSS_{{{i+1}}}$')
             plt.ylim(-0.5, 1.5)
             plt.xlabel("Time [orbits]")
             plt.ylabel("Sensor Output")
 
-
-        #where the sensors collectively think the sun is (orientation vector)
-        #plt.figure(3)
-        #not sure what i was thinking when i made this plot
-        plt.figure(3)
-        sensedSun = np.array(sensedSun)
-        plt.plot(satLog.times () * macros.NANO2SEC / period, sensedSun[:, 0], label=rf"$\sigma_{1}$")
-        plt.plot(satLog.times () * macros.NANO2SEC / period, sensedSun[:, 1], label=rf"$\sigma_{2}$")
-        plt.plot(satLog.times () * macros.NANO2SEC / period, sensedSun[:, 2], label=rf"$\sigma_{3}$")
-        plt.title("Sun Orientation via CSS Data (Inertial, 321 Euler)")
-        plt.legend()
-        plt.xlabel("Time [orbits]")
-        plt.ylabel("Orientation (rad)")
+        if CSSsun:
+            #where the sensors collectively think the sun is (orientation vector)
+            #plt.figure(3)
+            #not sure what i was thinking when i made this plot
+            plt.figure(3)
+            sensedSun = np.array(sensedSun)
+            plt.plot(satLog.times () * macros.NANO2SEC / period, sensedSun[:, 0], label=rf"$\sigma_{1}$")
+            plt.plot(satLog.times () * macros.NANO2SEC / period, sensedSun[:, 1], label=rf"$\sigma_{2}$")
+            plt.plot(satLog.times () * macros.NANO2SEC / period, sensedSun[:, 2], label=rf"$\sigma_{3}$")
+            plt.title("Sun Orientation via CSS Data (Inertial, 321 Euler)")
+            plt.legend()
+            plt.xlabel("Time [orbits]")
+            plt.ylabel("Orientation (rad)")
 
         #satellite orientation relative to inertial
         plt.figure(4)
@@ -335,8 +343,19 @@ def simulate(plot):
         plt.ylabel("Orientation (MRP)")
         plt.legend()
 
+        plt.figure(5)
+        for i in range(numCSS):
+            plt.plot(satLog.times() / period, faults[:, i], label=rf"$CSS_{{{i+1}}}$")
+        plt.title("CSS Sensors' Fault State")
+        plt.xlabel("Time [orbits]")
+        plt.ylabel("Fault State")
+        plt.legend()
+
         plt.tight_layout()
         plt.show()
-    return satLog.times() / period, sigma, sensedSun, CSSdata
-simulate(True)
+
+    return np.array(satLog.times() / period), np.array(sigma), np.array(sensedSun), np.array(CSSdata), np.array(faults)
+
+if __name__ == "__main__":
+    simulate(False, False)
     

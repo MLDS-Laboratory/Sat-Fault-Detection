@@ -1,4 +1,3 @@
-from utilities.fault import Fault
 from collections.abc import Collection
 from collections import OrderedDict
 from typing import Any
@@ -29,12 +28,18 @@ class CSSfault(sysModel.SysModel):
         defaults = kwargs.get("defaults")
         self.components = components
         self.defaults = defaults
-        self.types = ["OFF", "STUCK_CURRENT", "STUCK_MAX", "STUCK_RAND", "RAND", "NOMINAL"]
+        self.builtin = ["OFF", "STUCK_CURRENT", "STUCK_MAX", "STUCK_RAND", "RAND", "NOMINAL"]
+        self.types = kwargs.get("types")
+        if not self.types:
+            self.types = self.builtin#["NOMINAL", "RAND", "NOMINAL", "RAND", "RAND", "NOMINAL"]
+        if len(self.types) < 6:
+            self.types.extend(["NOMINAL"] * (6 - len(self.types)))
         super().__init__()
         #loggable attribute for fault states
         self.faultState = ["NOMINAL"] * len(self.components) #all sensors are assumed to start off nominal
         self.chance = kwargs.get("chance")
         self.seed = kwargs.get("seed")
+        self.rand = [False] * len(self.components)
         for i in self.components:
             i.faultState = getattr(coarseSunSensor, "NOMINAL") #forcibly make all sensors nominal at first
     """
@@ -87,9 +92,14 @@ class CSSfault(sysModel.SysModel):
                 #check if the last fault state was RAND, and change back to NOMINAL if so
                 past = self.components[i].faultState
                 if past == 4:
-                    newSettings.append("NOMINAL")
+                    if self.rand[i]:
+                        newSettings.append("NOMINAL")
+                        self.rand[i] = False
+                    else:
+                        self.rand[i] = True
+                        newSettings.append("RAND")
                 else:
-                    newSettings.append(self.types[self.components[i].faultState])
+                    newSettings.append(self.builtin[self.components[i].faultState])
         return list(zip(toInject, self.inject(newSettings)))
     
     """
