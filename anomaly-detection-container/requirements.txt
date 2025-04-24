@@ -8,3 +8,4 @@ torchvision
 pandas
 scikit-learn
 scipy
+seaborn
