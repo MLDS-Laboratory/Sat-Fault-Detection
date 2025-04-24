@@ -14,7 +14,7 @@ from pipelines.ops_sat_dataloader import OpsSatDataLoader
 from gaf_data_loader import OpsSatGAFDataset
 
 
-def main():
+def main_training(cnn_model, optimizer):
     # file paths for the OPS-SAT dataset
     dataset_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/OPS-SAT/dataset.csv"))
     segment_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/OPS-SAT/segments.csv"))
@@ -65,6 +65,14 @@ def main():
     # TODO: mess with loss function
     criterion = torch.nn.CrossEntropyLoss()
     
+    # initialize the trainer and run training
+    trainer = ModelTrainer(cnn_model, dataloaders, criterion, optimizer, device)
+    trainer.train(num_epochs=10)
+    print("Evaluating on test data:")
+    trainer.evaluate(phase='test')
+
+if __name__ == "__main__":
+
     # scratch architecture
     model = CNNFromScratch(num_classes=2, input_size=224)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
@@ -72,12 +80,5 @@ def main():
     # pretrained resnet architecture
     # model = get_pretrained_resnet(num_classes=2, freeze_early=True)
     # optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
-    
-    # initialize the trainer and run training
-    trainer = ModelTrainer(model, dataloaders, criterion, optimizer, device)
-    trainer.train(num_epochs=10)
-    print("Evaluating on test data:")
-    trainer.evaluate(phase='test')
 
-if __name__ == "__main__":
-    main()
+    main_training(model, optimizer)
