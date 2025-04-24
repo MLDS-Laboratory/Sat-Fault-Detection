@@ -7,16 +7,21 @@ import matplotlib.pyplot as plt
 import sys
 import os
 import seaborn as sns
+import shap
 #weirdness occurred when i didn't have this
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
 sys.path.append(parent_dir)
 #import twoModeScenario as sc #this test is currently setup to run twoModeScenario, which only has pseudofaults
 import simpleRWFaultScenario as sc
 np.set_printoptions(threshold=np.inf)
-quality = []
+
 #run the simulation, combine the data per timestep
-for i in range(1000):
-    try:
+
+iterate = True
+SHAP = True
+
+def runLIME():
+    
         times, sigma, td, ta, faults, fric = sc.simulate(False)
         features = []
         times /= 1e9
@@ -74,53 +79,106 @@ for i in range(1000):
                 sys.exit()
         #CLASSIFIER MUST HAVE A PROBABILITY IN ITS PREDICTION
         #top_labels tells it how many labels to explain, in order from most to least likely
+        fric_instance = test[j, -2:]
         exp = explainer.explain_instance(np.array(test[j, 1:-2]), rf.predict_proba, num_features=len(feature_names), top_labels=len(class_names))
         weights = sorted(exp.as_list(), key=lambda x: abs(x[1]), reverse=True)
         weights = np.array([int(i[0][-1]) for i in weights])
-        fric_instance = test[j, -2:]
+        
         indices = np.where(weights == int(fric_instance[0]))[0]
         quality.append((fric_instance[1], (indices[0], indices[1])))
-    except:
-        continue
+        if SHAP:
+            shap_explainer = shap.TreeExplainer(rf)
+            shap_values = np.argsort(np.abs(shap_explainer.shap_values(test[j, 1:-2], labels_test[j])[:, 1]))[::-1]
+            shap_values = np.array([i + 1 for i in shap_values])
+            shap_indices = np.where(shap_values == int(fric_instance[0]))[0]
+            shap_indices = np.concatenate((shap_indices, np.where(shap_values == int(fric_instance[0] + 3))[0]))
+            shap_quality.append((fric_instance[1], (shap_indices[0], shap_indices[1])))
+        else:
+            shap_explainer = None
+            
+        
+
+        return test, j, feature_names, labels_test, exp, trues, td, times, shap_explainer
 
 
 
-#outputs
-"""
-print(f"Observation Explained:")
-print(f"time: {test[j][0]}")
-for i in range(len(feature_names)):
-    print(f"{feature_names[i]}: {test[j, 1:][i]}")
-print(f"Actual Observation Label: {labels_test[j]}")
-print(f"Predicted Observation Label: {np.argmax(rf.predict_proba(test[j-1:j+1, 1:])[1])}")
-print(f"LIME model bias for predicted class: {exp.intercept[0]}")
-print(f"LIME model bias for other class: {exp.intercept[1]}")
-print(f"R^2 of LIME's local linear model: {exp.score}")
+if iterate:
+    quality = []
+    shap_quality = []
+    num_error = 0
+    count = 250
+    for i in range(count):
+        try:
+            runLIME()
+        except:
+            num_error += 1
+            continue
+    
+    mag = [i[0] for i in quality]
+    weight = [1. / (i[1][0] + i[1][1]) for i in quality]
+    sns.regplot(x=mag, y=weight, scatter=True, line_kws={'color':'red'})
+    plt.title("Quality of LIME Explanation vs Friction Fault Magnitude")
+    plt.ylabel("Derived Quality of Explanation")
+    plt.xlabel("Maximum Magnitude of Viscous Friction Coefficient")
+    plt.savefig("RW_Friction_Magnitude_LIME_Analysis_Derived_Quality_vs_Magnitude_5.png")
 
-plt.figure(1)
-#mrpFeedback Desired Torque Outputs
-for i in range(len(td[0])):
-    plt.plot(times, td[:, i], label=f'RW {i+1}')
-true_preds = np.array(test[trues])
-actual_preds = np.array([test[i][0] for i in range(len(labels_test)) if labels_test[i] == 1])
-for i in actual_preds:
-    plt.axvline(x=i, color='g')
-for i in true_preds[:, 0]:
-    plt.axvline(x=i, linestyle='--', color='r')
-plt.title("mrpFeedback Desired Torques")
-plt.legend()
-plt.xlabel("Time [orbits]")
-plt.ylabel("Torque [N-m]")
-plt.xlim(test[j][0] - 0.1, test[j][0] + 0.1)
+    print(f"ERROR PERCENTAGE: {num_error * 1. / count}")
+    plt.figure()
+    if len(shap_quality) > 1:
+        mag = [i[0] for i in shap_quality]
+        weight = [1. / (i[1][0] + i[1][1]) for i in shap_quality]
+        sns.regplot(x=mag, y=weight, scatter=True, line_kws={'color':'red'})
+        plt.title("Quality of SHAP Explanation vs Friction Fault Magnitude")
+        plt.ylabel("Derived Quality of Explanation")
+        plt.xlabel("Maximum Magnitude of Viscous Friction Coefficient")
+        plt.savefig("RW_Friction_Magnitude_SHAP_Analysis_Derived_Quality_vs_Magnitude_3.png")
+    plt.show()
+else:
+    test, j, feature_names, labels_test, rf, exp, trues, td, times, explainer = runLIME()
+    #outputs
+    print(f"Observation Explained:")
+    print(f"time: {test[j][0]}")
+    for i in range(len(feature_names)):
+        print(f"{feature_names[i]}: {test[j, 1:-2][i]}")
+    print(f"Actual Observation Label: {labels_test[j]}")
+    print(f"Predicted Observation Label: {np.argmax(rf.predict_proba(test[j-1:j+1, 1:-2])[1])}")
+    print(f"LIME model bias for predicted class: {exp.intercept[0]}")
+    print(f"LIME model bias for other class: {exp.intercept[1]}")
+    print(f"R^2 of LIME's local linear model: {exp.score}")
 
-fig = exp.as_pyplot_figure(exp.top_labels[0])
-plt.show()
-"""
-mag = [i[0] for i in quality]
-weight = [1. / (i[1][0] + i[1][1]) for i in quality]
-sns.regplot(x=mag, y=weight, scatter=True, line_kws={'color':'red'})
-plt.title("Quality of Explanation vs Friction Fault Magnitude")
-plt.ylabel("Derived Quality of Explanation")
-plt.xlabel("Maximum Magnitude of Viscous Friction Coefficient")
-plt.savefig("RW_Friction_Magnitude_Analysis_Derived_Quality_vs_Magnitude_1000_1.png")
-plt.show()
+    plt.figure(1)
+    #mrpFeedback Desired Torque Outputs
+    for i in range(len(td[0])):
+        plt.plot(times, td[:, i], label=f'RW {i+1}')
+    true_preds = np.array(test[trues])
+    actual_preds = np.array([test[i][0] for i in range(len(labels_test)) if labels_test[i] == 1])
+    for i in actual_preds:
+        plt.axvline(x=i, color='g')
+    for i in true_preds[:, 0]:
+        plt.axvline(x=i, linestyle='--', color='r')
+    plt.title("mrpFeedback Desired Torques")
+    plt.legend()
+    plt.xlabel("Time [orbits]")
+    plt.ylabel("Torque [N-m]")
+    plt.xlim(test[j][0] - 0.1, test[j][0] + 0.1)
+
+    fig = exp.as_pyplot_figure(exp.top_labels[0])
+
+    if SHAP:
+        #SHAP STUFF
+        plt.figure(3)
+        
+        shap_values = explainer.shap_values(test[:, 1:-2], labels_test)
+        shap.waterfall_plot(shap.Explanation(values=shap_values[j, :, 1], base_values=explainer.expected_value[1], data=test[j, 1:-2], feature_names=feature_names))
+
+        plt.figure(4)
+        interaction = explainer.shap_interaction_values(test[j, 1:-2], labels_test[j])[:, :, 1]
+        sns.heatmap(interaction, xticklabels=feature_names, yticklabels=feature_names, cmap='coolwarm', center=0)
+        plt.title("SHAP Interaction Values for Explained Instance")
+
+    plt.show()
+
+
+
+
+

@@ -31,7 +31,7 @@ class CSSfault(sysModel.SysModel):
         self.builtin = ["OFF", "STUCK_CURRENT", "STUCK_MAX", "STUCK_RAND", "RAND", "NOMINAL"]
         self.types = kwargs.get("types")
         if not self.types:
-            self.types = self.builtin#["NOMINAL", "RAND", "NOMINAL", "RAND", "RAND", "NOMINAL"]
+            self.types = ["NOMINAL", "STUCK_CURRENT", "NOMINAL", "STUCK_CURRENT", "STUCK_CURRENT", "NOMINAL"]
         if len(self.types) < 6:
             self.types.extend(["NOMINAL"] * (6 - len(self.types)))
         super().__init__()

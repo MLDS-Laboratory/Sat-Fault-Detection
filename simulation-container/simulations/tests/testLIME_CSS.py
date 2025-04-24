@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import sys
 import os
 import shap
+import seaborn as sns
 #weirdness occurred when i didn't have this
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
 sys.path.append(parent_dir)
@@ -144,12 +145,18 @@ plt.xlim(test[j][0] - 0.1, test[j][0] + 0.1)
 """
 fig = exp.as_pyplot_figure(exp.top_labels[0])
 #fig1 = exp.as_pyplot_figure(exp.top_labels[1])
-""" SHAP STUFF
-plt.figure()
+
+#SHAP STUFF
+plt.figure(3)
 explainer = shap.TreeExplainer(rf)
 shap_values = explainer.shap_values(test[:, 1:], labels_test)
-fig1 = shap.waterfall_plot(shap.Explanation(values=shap_values[j, :, 1], base_values=explainer.expected_value[1], data=test[j, 1:], feature_names=feature_names))
-"""
+shap.waterfall_plot(shap.Explanation(values=shap_values[j, :, 1], base_values=explainer.expected_value[1], data=test[j, 1:], feature_names=feature_names))
+
+plt.figure(4)
+interaction = explainer.shap_interaction_values(test[j, 1:], labels_test[j])[:, :, 1]
+sns.heatmap(interaction, xticklabels=feature_names, yticklabels=feature_names, cmap='coolwarm', center=0)
+plt.title("SHAP Interaction Values for Explained Instance")
+
 plt.show()
 
 
