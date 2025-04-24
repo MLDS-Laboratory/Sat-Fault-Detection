@@ -1,11 +1,14 @@
 import os
+import sys
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from matplotlib.gridspec import GridSpec
-from data_loader import OpsSatDataLoader
 from gaf_transform import compute_gaf
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
+from pipelines.ops_sat_dataloader import OpsSatDataLoader
 
 def visualize_single_gaf(segment, image_size=224, save_path=None):
     """

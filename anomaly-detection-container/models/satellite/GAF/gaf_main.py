@@ -1,13 +1,17 @@
 import os
+import sys
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from data_loader import OpsSatDataLoader, OpsSatGAFDataset
 from CNNs.pretrained_resnet import get_pretrained_resnet
 from CNNs.scratch_cnn import CNNFromScratch
 from CNNs.cnn_training import ModelTrainer
 import torch.optim as optim
 from torch.utils.data import Subset
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
+from pipelines.ops_sat_dataloader import OpsSatDataLoader
+from gaf_data_loader import OpsSatGAFDataset
 
 
 def main():
