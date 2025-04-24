@@ -23,8 +23,8 @@ def run_experiment(model_name, model, hyperparams):
       - final test accuracy, test F1, test confusion matrix
     """
     # Load data
-    dataset_csv = os.path.abspath(os.path.join(__file__, "../../../data/OPS-SAT/dataset.csv"))
-    segment_csv = os.path.abspath(os.path.join(__file__, "../../../data/OPS-SAT/segments.csv"))
+    dataset_csv = os.path.abspath(os.path.join(__file__, "../../../../data/OPS-SAT/dataset.csv"))
+    segment_csv = os.path.abspath(os.path.join(__file__, "../../../../data/OPS-SAT/segments.csv"))
     loader = OpsSatDataLoader(dataset_csv, segment_csv)
     train_segs, test_segs = loader.get_train_test_segments()
 

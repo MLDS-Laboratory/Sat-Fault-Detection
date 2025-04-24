@@ -1,3 +1,5 @@
 # ignore anything in the data directory that is not a .py file
 data/*
 !data/*.py
+
+outputs
