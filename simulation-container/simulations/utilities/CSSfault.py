@@ -79,7 +79,7 @@ class CSSfault(sysModel.SysModel):
     and fault state is the new (or old, if no new fault) setting. 
     """
     def inject_random(self, chance):
-        if not chance:
+        if chance is None:
             chance = 0.0005
         toInject = self.randomize(chance, seed=self.seed)
         newSettings = []

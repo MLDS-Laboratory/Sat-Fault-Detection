@@ -113,6 +113,13 @@ def simulate(plot):
     nav.scStateInMsg.subscribeTo(satellite.scStateOutMsg)
     nav.sunStateInMsg.subscribeTo(spice.planetStateOutMsgs[1])
 
+    #constant disturbance so the RWs are always active
+    ext = extForceTorque.ExtForceTorque()
+    satellite.addDynamicEffector(ext)
+    ext.extTorquePntB_B = [0.0015, 0.0015, 0.0015]
+    satSim.AddModelToTask(simTaskName, ext)
+    
+
     #inertial reference attitude
     inertial = inertial3D.inertial3D()
     inertial.ModelTag = "inertial3D"
@@ -150,9 +157,9 @@ def simulate(plot):
     """
     maxMomentum = 100.
     defaults = [
-         {"axis":[1, 0, 0], "u_max":0.2, "rwType":"Honeywell_HR16"},
-         {"axis":[0, 1, 0], "u_max":0.2, "rwType":"Honeywell_HR16"},
-         {"axis":[0, 0, 1], "u_max":0.2, "rwType":"Honeywell_HR16"},
+         {"axis":[1, 0, 0], "u_max":0.05, "rwType":"Honeywell_HR16"},
+         {"axis":[0, 1, 0], "u_max":0.05, "rwType":"Honeywell_HR16"},
+         {"axis":[0, 0, 1], "u_max":0.05, "rwType":"Honeywell_HR16"},
     ]
     
     for i in range(len(defaults)):
@@ -174,7 +181,7 @@ def simulate(plot):
         components.append((defaults[count]["rwType"], rwFactory.rwList[i]))
         count += 1
     #see rwfault.py for notes on requirements
-    rwf = RWFault(components, rwFactory = rwFactory, rwEffector=rwEffector, defaults=defaults, rwModel=rwModel, chance=0.001)
+    rwf = RWFault(components, rwFactory = rwFactory, rwEffector=rwEffector, defaults=defaults, rwModel=rwModel, chance=0.0025)
     satSim.AddModelToTask(simTaskName, rwf)
 
     #control torque
@@ -258,11 +265,16 @@ def simulate(plot):
     stateLog = rwf.logger("state")
     satSim.AddModelToTask(simTaskName, stateLog)
 
+    #number of faults per component
+    faultCountLog = rwf.logger("count")
+    satSim.AddModelToTask(simTaskName, faultCountLog)
+
     """simulation start"""
     satSim.SetProgressBar(True)
     satSim.InitializeSimulation()
     satSim.ConfigureStopTime(simTime)
     satSim.ExecuteSimulation()
+
 
     #update faultLog to indicate all timesteps after injection as a fault
     faultLog = np.array(faultLog.fault)
@@ -271,6 +283,8 @@ def simulate(plot):
             if faultLog[i-1, j]:
                 faultLog[i, j] = True
     
+
+    count = faultCountLog.count
     #extract actual output torques from recorder
     motorTorque = [rw.u_current for rw in rwTorqueLog]
 
@@ -305,20 +319,20 @@ def simulate(plot):
         plt.xlabel("Time [orbits]")
         plt.ylabel("Torque [N-m]")
         plt.ylim(-0.22, 0.22)
+        plt.ylim(-0.005, 0.005)
 
         #fault plotting
         plt.figure(4)
         for i in range(numRW):
-            plt.plot(satLog.times() / period, faultLog[:, i], label=f'RW {i+1}')
+            plt.plot(satLog.times() / period, count[:, i], label=f'RW {i+1}')
         plt.title("RW Fault State")
         plt.legend()
         plt.xlabel("Time [orbits]")
         plt.ylabel("Fault State (binary)")
-        plt.ylim(-0.1, 1.1)
 
         plt.tight_layout()
         plt.show()
-    return satLog.times(), sigma, rwMotorLog.motorTorque[:, :3], motorTorque, faultLog
+    return np.array(satLog.times() / period), np.array(sigma), np.array(rwMotorLog.motorTorque[:, :3]), np.array(motorTorque), np.array(faultLog)
 
 """
 This is a miniaturized version of dataloader.py for this specific scenario. 

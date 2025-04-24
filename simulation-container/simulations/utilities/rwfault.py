@@ -46,6 +46,7 @@ class RWFault(sysModel.SysModel):
         self.state = [(i["rwType"], i["axis"], i["u_max"]) for i in self.defaults]
         #loggable attribute for the timesteps of fault injections
         self.fault = [False for _ in self.components]
+        self.count = [0] * len(self.components)
 
     """
     Update method. Runs every timestep. 
@@ -56,6 +57,7 @@ class RWFault(sysModel.SysModel):
         state = self.inject_random(self.chance)
         self.state = state[:, 1]
         self.fault = state[:, 0]
+        self.count = [self.count[i] + 1 if self.fault[i] else self.count[i] for i in range(len(self.components))]
     
 
     """
@@ -78,6 +80,7 @@ class RWFault(sysModel.SysModel):
             self.rwEffector.addReactionWheel(RW_new)
             newComps.append((rwType, RW_new))
         self.components = newComps
+        
     """
     Resets all RWs to default settings. 
     """
@@ -117,7 +120,7 @@ class RWFault(sysModel.SysModel):
     """
     def inject_random(self, chance : float) -> Collection[tuple[bool, Any]]:
         #if chance isn't passed in
-        if not chance:
+        if chance is None:
             chance = 0.001
         toInject = self.randomize(chance, seed=self.seed)
         if self.seed:
