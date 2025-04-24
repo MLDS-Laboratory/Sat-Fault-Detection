@@ -96,6 +96,6 @@ class ModelTrainer:
         cm = confusion_matrix(all_labels, all_preds)
 
         print(f"Test Accuracy: {acc:.4f}, Test F1: {f1:.4f}")
-        print("Confusion Matrix:")                          # apparently helpful for imbalanced datasets
+        print("Confusion Matrix:")                          
         print(cm)
         return acc, f1, cm

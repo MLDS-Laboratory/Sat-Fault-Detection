@@ -16,8 +16,8 @@ from gaf_data_loader import OpsSatGAFDataset
 
 def main():
     # file paths for the OPS-SAT dataset
-    dataset_csv = "C:\\Users\\varun\\Documents\\UMD\\Research\\MLDS\\Sat-Fault-Detection\\anomaly-detection-container\\data\\OPS-SAT\\dataset.csv"
-    segment_csv = "C:\\Users\\varun\\Documents\\UMD\\Research\\MLDS\\Sat-Fault-Detection\\anomaly-detection-container\\data\\OPS-SAT\\segments.csv"
+    dataset_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/OPS-SAT/dataset.csv"))
+    segment_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/OPS-SAT/segments.csv"))
     
     # load data using OpsSatDataLoader
     data_loader = OpsSatDataLoader(dataset_csv, segment_csv)

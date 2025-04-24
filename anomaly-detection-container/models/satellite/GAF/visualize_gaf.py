@@ -157,10 +157,10 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Visualize GAF images from OPS-SAT dataset.')
     parser.add_argument('--dataset_csv', type=str, 
-                      default="C:\\Users\\varun\\Documents\\UMD\\Research\\MLDS\\Sat-Fault-Detection\\anomaly-detection-container\\data\\OPS-SAT\\dataset.csv", 
+                      default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/OPS-SAT/dataset.csv")), 
                       help='Path to dataset.csv')
     parser.add_argument('--segment_csv', type=str, 
-                      default="C:\\Users\\varun\\Documents\\UMD\\Research\\MLDS\\Sat-Fault-Detection\\anomaly-detection-container\\data\\OPS-SAT\\segments.csv", 
+                      default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/OPS-SAT/segments.csv")), 
                       help='Path to segments.csv')
     parser.add_argument('--segment_idx', type=int, default=0, 
                       help='Index of segment to visualize (for single visualization)')
