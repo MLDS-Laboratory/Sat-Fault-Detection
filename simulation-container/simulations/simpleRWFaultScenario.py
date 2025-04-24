@@ -5,6 +5,7 @@ from utilities.rwfault import RWFault
 import psycopg2
 from psycopg2 import sql
 import json  
+import sys
 
 #utilities?
 from Basilisk.architecture import messaging
@@ -32,6 +33,10 @@ from Basilisk.fswAlgorithms import rwMotorTorque
 
 #general simulation initialization, i think
 from Basilisk.utilities import SimulationBaseClass
+
+#debugging
+np.set_printoptions(threshold=np.inf)
+
 
 def simulate(plot):
     #a bunch of initializations
@@ -157,13 +162,14 @@ def simulate(plot):
     """
     maxMomentum = 100.
     defaults = [
-         {"axis":[1, 0, 0], "u_max":0.05, "rwType":"Honeywell_HR16"},
-         {"axis":[0, 1, 0], "u_max":0.05, "rwType":"Honeywell_HR16"},
-         {"axis":[0, 0, 1], "u_max":0.05, "rwType":"Honeywell_HR16"},
+         {"axis":[1, 0, 0], "u_max":0.05, "rwType":"Honeywell_HR16",  "cViscous":0.0005},
+         {"axis":[0, 1, 0], "u_max":0.05, "rwType":"Honeywell_HR16",  "cViscous":0.0005},
+         {"axis":[0, 0, 1], "u_max":0.05, "rwType":"Honeywell_HR16",  "cViscous":0.0005},
     ]
     
     for i in range(len(defaults)):
-         rwFactory.create(defaults[i]["rwType"], defaults[i]["axis"], maxMomentum=maxMomentum, RWModel=rwModel, u_max=defaults[i]["u_max"])
+         rwFactory.create(defaults[i]["rwType"], defaults[i]["axis"], maxMomentum=maxMomentum, RWModel=rwModel, u_max=defaults[i]["u_max"], 
+                          cViscous=defaults[i]["cViscous"])
 
     numRW = rwFactory.getNumOfDevices()
     
@@ -181,7 +187,8 @@ def simulate(plot):
         components.append((defaults[count]["rwType"], rwFactory.rwList[i]))
         count += 1
     #see rwfault.py for notes on requirements
-    rwf = RWFault(components, rwFactory = rwFactory, rwEffector=rwEffector, defaults=defaults, rwModel=rwModel, chance=0.0025)
+    rwf = RWFault(components, rwFactory = rwFactory, rwEffector=rwEffector, defaults=defaults, rwModel=rwModel, chance=0.001, 
+                types=["friction"])
     satSim.AddModelToTask(simTaskName, rwf)
 
     #control torque
@@ -274,8 +281,8 @@ def simulate(plot):
     satSim.InitializeSimulation()
     satSim.ConfigureStopTime(simTime)
     satSim.ExecuteSimulation()
-
-
+    
+    
     #update faultLog to indicate all timesteps after injection as a fault
     faultLog = np.array(faultLog.fault)
     for i in range(1, len(faultLog)):
@@ -286,10 +293,9 @@ def simulate(plot):
 
     count = faultCountLog.count
     #extract actual output torques from recorder
-    motorTorque = [rw.u_current for rw in rwTorqueLog]
-
+    motorTorque = np.array([rw.u_current for rw in rwTorqueLog])
     sigma  = np.array(satLog.sigma_BN)
-
+    fricLog = np.array([[t[3] for t in col] for col in stateLog.state])
     """plotting"""
     if plot:
         plt.figure(1)
@@ -332,7 +338,7 @@ def simulate(plot):
 
         plt.tight_layout()
         plt.show()
-    return np.array(satLog.times() / period), np.array(sigma), np.array(rwMotorLog.motorTorque[:, :3]), np.array(motorTorque), np.array(faultLog)
+    return np.array(satLog.times() / period), np.array(sigma), np.array(rwMotorLog.motorTorque[:, :3]), np.array(motorTorque), np.array(faultLog), np.array(fricLog)
 
 """
 This is a miniaturized version of dataloader.py for this specific scenario. 

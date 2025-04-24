@@ -34,6 +34,10 @@ class RWFault(sysModel.SysModel):
         self.seed = kwargs.get("seed")
         self.chance = kwargs.get("chance")
         self.defaults = kwargs.get("defaults")
+        self.friction = kwargs.get("friction")
+        self.types = kwargs.get("types")
+        if not self.types:
+            self.types = ["torque"]
         #if the defaults are not passed in, the defaults are pulled from the starting states
         if not self.defaults:
             self.defaults = []
@@ -41,9 +45,10 @@ class RWFault(sysModel.SysModel):
                 spin = [sublist[0] for sublist in self.components[i][1].gsHat_B]
                 rwType = self.components[i][0]
                 u_max = self.components[i][1].u_max
-                self.defaults.append({"axis":spin, "u_max":u_max, "rwType":rwType})
+                cvis = self.components[i][1].cViscous
+                self.defaults.append({"axis":spin, "u_max":u_max, "rwType":rwType, "cViscous":cvis})
         #loggable attribute for the actual traits of the RWs
-        self.state = [(i["rwType"], i["axis"], i["u_max"]) for i in self.defaults]
+        self.state = [(i["rwType"], i["axis"], i["u_max"], i["cViscous"]) for i in self.defaults]
         #loggable attribute for the timesteps of fault injections
         self.fault = [False for _ in self.components]
         self.count = [0] * len(self.components)
@@ -70,13 +75,15 @@ class RWFault(sysModel.SysModel):
     """
     def replaceRWs(self, newRWs):
         #empty existing RW carriers
+
         self.rwFactory.rwList = OrderedDict([])
         self.rwEffector.ReactionWheelData = self.rwEffector.ReactionWheelData[:0]
         newComps = []
         #create new RWs
-        for (rwType, spin, torque) in newRWs:
+        for (rwType, spin, torque, cvis) in newRWs:
             rwModel = self.rwModel if self.rwModel else messaging.BalancedWheels
-            RW_new = self.rwFactory.create(rwType, spin, maxMomentum=100., RWmodel=rwModel, u_max=torque)
+            RW_new = self.rwFactory.create(rwType, spin, maxMomentum=100., RWmodel=rwModel, u_max=torque, 
+                                            cViscous=cvis)
             self.rwEffector.addReactionWheel(RW_new)
             newComps.append((rwType, RW_new))
         self.components = newComps
@@ -93,7 +100,8 @@ class RWFault(sysModel.SysModel):
                 spin = self.defaults[i]["axis"]
                 u_max = self.defaults[i]["u_max"]
                 rwType = self.defaults[i]["type"]
-                resetRWs.append((rwType, spin, u_max))
+                cvis = self.defaults[i]["cViscous"]
+                resetRWs.append((rwType, spin, u_max, cvis))
         except:
             raise TypeError("Defaults and/or Components do not contain necessary information.")
         self.replaceRWs(resetRWs)
@@ -120,6 +128,7 @@ class RWFault(sysModel.SysModel):
     """
     def inject_random(self, chance : float) -> Collection[tuple[bool, Any]]:
         #if chance isn't passed in
+
         if chance is None:
             chance = 0.001
         toInject = self.randomize(chance, seed=self.seed)
@@ -130,12 +139,16 @@ class RWFault(sysModel.SysModel):
             #spin and rwType stay the same
             spin = [sublist[0] for sublist in self.components[i][1].gsHat_B]
             rwType = self.components[i][0]
-            #u_max is changed if there's a fault by a random factor
+            #u_max and/or cvis is changed if there's a fault by a random factor
             u_max = self.components[i][1].u_max
+            cvis = self.components[i][1].cViscous
             if toInject[i]:
                 rand = random.random() * 10
-                u_max = u_max / rand if rand >= 1 else u_max * rand
-            newSettings.append((rwType, spin, u_max))
+                if "torque" in self.types:
+                    u_max = u_max / rand if rand >= 1 else u_max * rand
+                if "friction" in self.types:
+                    cvis = cvis / rand if rand < 1 else cvis * rand
+            newSettings.append((rwType, spin, u_max, cvis))
         details = list(zip(toInject, self.inject(newSettings)))
         return np.array(details, dtype=object)
     
