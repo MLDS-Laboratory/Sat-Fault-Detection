@@ -31,10 +31,14 @@ def main(path: Path, n_rows: int = 5):
     if isinstance(obj, (pd.Series, pd.DataFrame)):
         print(f"Shape             : {obj.shape}")
         print(f"Index dtype       : {obj.index.dtype}")
-        print(f"Head ({n_rows} rows):")
+        print(f"Head ({n_rows} rows):\n\n\n")
         print(obj.head(n_rows))
+
+        # print the column names if it's a DataFrame
+        if isinstance(obj, pd.DataFrame):
+            print(f"Columns           : {obj.columns.tolist()}")
     else:
-        print("First few entries:\n", obj)
+        print("First few entries:\n\n\n", obj)
 
     # extra sanity—timestamps should be monotonic
     if hasattr(obj.index, "is_monotonic_increasing"):
@@ -43,20 +47,20 @@ def main(path: Path, n_rows: int = 5):
 
     # find where there are time gaps greater than x minutes in the data and display the timestamps and indices
     # Assuming the index is a DatetimeIndex
-    if not isinstance(obj.index, pd.DatetimeIndex):
-        # Try converting to DatetimeIndex if possible
-        try:
-            obj.index = pd.to_datetime(obj.index)
-        except Exception as e:
-            print(f"Unable to convert index to datetime: {e}")
-            return
+    # if not isinstance(obj.index, pd.DatetimeIndex):
+    #     # Try converting to DatetimeIndex if possible
+    #     try:
+    #         obj.index = pd.to_datetime(obj.index)
+    #     except Exception as e:
+    #         print(f"Unable to convert index to datetime: {e}")
+    #         return
 
-    gap_threshold = 20
-    print(f"\nTime gaps greater than {gap_threshold} minutes:")
-    for i in range(1, len(obj.index)):
-        gap = obj.index[i] - obj.index[i - 1]
-        if gap > pd.Timedelta(minutes=gap_threshold):
-            print(f"Gap from index {i-1} ({obj.index[i-1]}) to index {i} ({obj.index[i]}): Gap = {gap}")
+    # gap_threshold = 20
+    # print(f"\nTime gaps greater than {gap_threshold} minutes:")
+    # for i in range(1, len(obj.index)):
+    #     gap = obj.index[i] - obj.index[i - 1]
+    #     if gap > pd.Timedelta(minutes=gap_threshold):
+    #         print(f"Gap from index {i-1} ({obj.index[i-1]}) to index {i} ({obj.index[i]}): Gap = {gap}")
 
 
 if __name__ == "__main__":
