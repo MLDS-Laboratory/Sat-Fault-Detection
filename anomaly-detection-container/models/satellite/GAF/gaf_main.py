@@ -10,7 +10,8 @@ import torch.optim as optim
 from torch.utils.data import Subset
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
-from pipelines.ops_sat_dataloader import OpsSatDataLoader
+# from pipelines.ops_sat_dataloader import OpsSatDataLoader
+from pipelines.esa_dataloader import ESAMissionDataLoader
 from gaf_data_loader import OpsSatGAFDataset
 
 
@@ -23,9 +24,12 @@ def run_experiment(model_name, model, hyperparams):
       - final test accuracy, test F1, test confusion matrix
     """
     # Load data
-    dataset_csv = os.path.abspath(os.path.join(__file__, "../../../../data/OPS-SAT/dataset.csv"))
-    segment_csv = os.path.abspath(os.path.join(__file__, "../../../../data/OPS-SAT/segments.csv"))
-    loader = OpsSatDataLoader(dataset_csv, segment_csv)
+    # dataset_csv = os.path.abspath(os.path.join(__file__, "../../../../data/OPS-SAT/dataset.csv"))
+    # segment_csv = os.path.abspath(os.path.join(__file__, "../../../../data/OPS-SAT/segments.csv"))
+    # loader = OpsSatDataLoader(dataset_csv, segment_csv)
+
+    mission_dir = os.path.abspath(os.path.join(__file__, "../../../../data/ESA-Anomaly/ESA-Mission1"))
+    loader = ESAMissionDataLoader(mission_dir=mission_dir)
     train_segs, test_segs = loader.get_train_test_segments()
 
     # Transforms

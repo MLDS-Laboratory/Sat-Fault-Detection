@@ -1,4 +1,3 @@
-
 import os
 import numpy as np
 import pandas as pd
@@ -26,13 +25,7 @@ class ESAMissionDataLoader:
         For reproducible shuffles / splits.
     """
 
-    def __init__(
-        self,
-        mission_dir: str,
-        nominal_segment_len: int | None = None,
-        train_ratio: float = 0.8,
-        random_state: int = 42,
-    ):
+    def __init__(self, mission_dir: str, nominal_segment_len: int | None = None, train_ratio: float = 0.8, random_state: int = 42):
         self.dir = os.path.abspath(mission_dir)
         self.nominal_segment_len = nominal_segment_len
         self.train_ratio = train_ratio
@@ -123,7 +116,21 @@ class ESAMissionDataLoader:
             # --> 1) create segments for each anomaly window
             # ------------------------------------------------------------------
             for _, lab in ch_labels.iterrows():
+                # Convert start and end to match the timezone of the index
                 start, end = lab["StartTime"], lab["EndTime"]
+                
+                # Check if idx has timezone info
+                if idx.tz is not None:
+                    # If labels don't have timezone but index does, localize them
+                    if start.tz is None:
+                        start = start.tz_localize(idx.tz)
+                    if end.tz is None:
+                        end = end.tz_localize(idx.tz)
+                # If idx has no timezone but labels do, remove timezone from labels
+                elif idx.tz is None and (start.tz is not None or end.tz is not None):
+                    start = start.tz_localize(None)
+                    end = end.tz_localize(None)
+                
                 mask = (idx >= start) & (idx <= end)
                 if not mask.any():
                     continue  # window outside available data
@@ -137,7 +144,7 @@ class ESAMissionDataLoader:
                         "ts": ts_segment,
                         "label": 1,
                         "sampling": sampling_sec,
-                        "train": None,  # to be filled later
+                        "train": 1,  # will be updated in get_train_test_segments
                     }
                 )
                 seg_id += 1
@@ -149,7 +156,22 @@ class ESAMissionDataLoader:
             if len(ch_labels) > 0:
                 mask_anom = np.zeros(len(idx), dtype=bool)
                 for _, lab in ch_labels.iterrows():
-                    mask_anom |= (idx >= lab["StartTime"]) & (idx <= lab["EndTime"])
+                    # Apply the same timezone conversion as above
+                    start, end = lab["StartTime"], lab["EndTime"]
+                    
+                    # Check if idx has timezone info
+                    if idx.tz is not None:
+                        # If labels don't have timezone but index does, localize them
+                        if start.tz is None:
+                            start = start.tz_localize(idx.tz)
+                        if end.tz is None:
+                            end = end.tz_localize(idx.tz)
+                    # If idx has no timezone but labels do, remove timezone from labels
+                    elif idx.tz is None and (start.tz is not None or end.tz is not None):
+                        start = start.tz_localize(None)
+                        end = end.tz_localize(None)
+                    
+                    mask_anom |= (idx >= start) & (idx <= end)
             else:
                 mask_anom = np.zeros(len(idx), dtype=bool)
 
@@ -189,7 +211,7 @@ class ESAMissionDataLoader:
                             "ts": ts_segment,
                             "label": 0,
                             "sampling": sampling_sec,
-                            "train": None,  # filled later
+                            "train": 1,  # filled later
                         }
                     )
                     seg_id += 1

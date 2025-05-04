@@ -12,10 +12,10 @@ from CNNs.scratch_cnn import CNNFromScratch
 def grid_search(output_csv="grid_search_results.csv"):
     # Define hyperparameter grid
     epochs_list       = [10]
-    batch_sizes       = [16, 32, 64]
-    learning_rates    = [1e-2, 1e-3]
+    batch_sizes       = [32]
+    learning_rates    = [5e-3]
     loss_fns = [
-        (torch.nn.CrossEntropyLoss(), "CrossEntropy"),
+        # (torch.nn.CrossEntropyLoss(), "CrossEntropy"),
         (torch.nn.CrossEntropyLoss(label_smoothing=0.1), "CrossEntropy_ls0.1")
     ]
 
@@ -87,4 +87,4 @@ def grid_search(output_csv="grid_search_results.csv"):
     print(f"\nGrid search complete! Results saved to {output_csv}")
 
 if __name__ == "__main__":
-    grid_search()
+    grid_search("esa_grid_search_results.csv")
