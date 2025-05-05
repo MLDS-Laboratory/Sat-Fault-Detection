@@ -12,10 +12,10 @@ from torch.utils.data import Subset
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
 # from pipelines.ops_sat_dataloader import OpsSatDataLoader
 from pipelines.esa_dataloader import ESAMissionDataLoader
-from gaf_data_loader import OpsSatGAFDataset
+from gaf_data_loader import GAFDataset
 
 
-def run_experiment(model_name, model, hyperparams):
+def run_main(model_name, model, hyperparams):
     """
     Run one training + eval with given model and hyperparameters.
     Returns a dict of:
@@ -28,10 +28,16 @@ def run_experiment(model_name, model, hyperparams):
     # segment_csv = os.path.abspath(os.path.join(__file__, "../../../../data/OPS-SAT/segments.csv"))
     # loader = OpsSatDataLoader(dataset_csv, segment_csv)
 
+    print("Create dataloaders...")
     mission_dir = os.path.abspath(os.path.join(__file__, "../../../../data/ESA-Anomaly/ESA-Mission1"))
     loader = ESAMissionDataLoader(mission_dir=mission_dir)
+    print("Loading segments...")
     train_segs, test_segs = loader.get_train_test_segments()
 
+    train_segs = train_segs[:500000]  # For testing purposes
+    test_segs = test_segs[:100000]  # For testing purposes
+
+    print(f"Train segments: {len(train_segs)}, Test segments: {len(test_segs)}")
     # Transforms
     tfms = {
         'train': transforms.Compose([
@@ -45,8 +51,9 @@ def run_experiment(model_name, model, hyperparams):
     }
 
     # Datasets
-    full_train = OpsSatGAFDataset(train_segs, transform=tfms['train'])
-    test_ds    = OpsSatGAFDataset(test_segs,  transform=tfms['val'])
+    print("Transforming segments to GAF images...")
+    full_train = GAFDataset(train_segs, transform=tfms['train'])
+    test_ds    = GAFDataset(test_segs,  transform=tfms['val'])
 
     # Train/Val split
     n = len(full_train)
@@ -57,9 +64,9 @@ def run_experiment(model_name, model, hyperparams):
     # Dataloaders
     bs = hyperparams['batch_size']
     dataloaders = {
-        'train': DataLoader(train_ds, batch_size=bs, shuffle=True,  num_workers=2),
-        'val':   DataLoader(val_ds,   batch_size=bs, shuffle=False, num_workers=2),
-        'test':  DataLoader(test_ds,  batch_size=bs, shuffle=False, num_workers=2)
+        'train': DataLoader(train_ds, batch_size=bs, shuffle=True,  num_workers=10),
+        'val':   DataLoader(val_ds,   batch_size=bs, shuffle=False, num_workers=10),
+        'test':  DataLoader(test_ds,  batch_size=bs, shuffle=False, num_workers=10)
     }
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -102,5 +109,5 @@ if __name__ == "__main__":
     # model = CNNFromScratch(num_classes=2, input_size=224); model_name="scratch"
     # or:
     model = get_pretrained_resnet(num_classes=2, freeze_early=True); model_name="pretrained"
-    res = run_experiment(model_name, model, hp)
+    res = run_main(model_name, model, hp)
     print(res)

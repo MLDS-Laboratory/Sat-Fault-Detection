@@ -5,7 +5,7 @@ import torch
 # ensure imports work
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
-from gaf_main import run_experiment
+from gaf_main import run_main
 from CNNs.pretrained_resnet import get_pretrained_resnet
 from CNNs.scratch_cnn import CNNFromScratch
 
@@ -19,8 +19,9 @@ def grid_search(output_csv="grid_search_results.csv"):
         (torch.nn.CrossEntropyLoss(label_smoothing=0.1), "CrossEntropy_ls0.1")
     ]
 
-    # Create outputs folder if it doesn't exist
-    outputs_dir = "models/satellite/GAF/outputs"
+    # Create outputs folder relative to the directory this file is in
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    outputs_dir = os.path.join(base_dir, "outputs")
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
     output_csv = os.path.join(outputs_dir, output_csv)
@@ -60,7 +61,7 @@ def grid_search(output_csv="grid_search_results.csv"):
                                 'loss_name': loss_name
                             }
                             print(f"\n=== Running {model_type} | epochs={epochs}, bs={bs}, lr={lr}, loss={loss_name} ===")
-                            res = run_experiment(model_type, model, hyperparams)
+                            res = run_main(model_type, model, hyperparams)
                             all_results.append(res)
                             
                             # Prepare row for CSV. Note: Convert the confusion matrix to JSON.
