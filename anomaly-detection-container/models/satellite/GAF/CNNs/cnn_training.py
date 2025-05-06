@@ -9,12 +9,14 @@ class ModelTrainer:
     Class to encapsulate training and evaluation routines for a given model.
     Records training and validation metrics per epoch for hyperparameter tuning.
     """
-    def __init__(self, model, dataloaders, criterion, optimizer, device):
+    def __init__(self, model, dataloaders, criterion, optimizer, device, mixed_precision=True):
         self.model = model.to(device)
         self.dataloaders = dataloaders
         self.criterion = criterion
         self.optimizer = optimizer
         self.device = device
+        self.mixed_precision = mixed_precision
+
         # Initialize history dict for tracking metrics
         self.history = {
             'train_loss': [], 'train_acc': [], 'train_f1': [],
@@ -24,6 +26,9 @@ class ModelTrainer:
     def train(self, num_epochs=10):
         best_f1 = 0.0
         best_model_wts = None
+
+        # mixed precision training
+        scaler = torch.cuda.amp.GradScaler("cuda") if (self.device.type == 'cuda' and self.mixed_precision) else None
         
         # Track total training time
         start_time = time.time()
@@ -61,13 +66,25 @@ class ModelTrainer:
                         self.optimizer.zero_grad()
                         
                         with torch.set_grad_enabled(phase == 'train'):
-                            outputs = self.model(inputs)
-                            _, preds = torch.max(outputs, 1)
-                            loss = self.criterion(outputs, labels)
-                            
-                            if phase == 'train':
-                                loss.backward()
-                                self.optimizer.step()
+
+                            if scaler is None:
+                                outputs = self.model(inputs)
+                                _, preds = torch.max(outputs, 1)
+                                loss = self.criterion(outputs, labels)
+                                
+                                if phase == 'train':
+                                    loss.backward()
+                                    self.optimizer.step()
+                            else:
+                                with torch.cuda.amp.autocast("cuda"):
+                                    outputs = self.model(inputs)
+                                    _, preds = torch.max(outputs, 1)
+                                    loss = self.criterion(outputs, labels)
+                                
+                                if phase == 'train':
+                                    scaler.scale(loss).backward()
+                                    scaler.step(self.optimizer)
+                                    scaler.update()
                         
                         # Update statistics
                         running_loss += loss.item() * inputs.size(0)
