@@ -3,6 +3,7 @@ import torch.nn as nn
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from tqdm import tqdm
 import time
+import os
 
 class ModelTrainer:
     """
@@ -22,6 +23,24 @@ class ModelTrainer:
             'train_loss': [], 'train_acc': [], 'train_f1': [],
             'val_loss':   [], 'val_acc':   [], 'val_f1':   []
         }
+
+    def save_model(self, path, save_entire_model=False):
+        """
+        Save model weights or the entire model to disk.
+        
+        Parameters:
+        - path: Path where to save the model
+        - save_entire_model: If True, saves the entire model. If False (default), saves only the state_dict
+        """
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+            
+        if save_entire_model:
+            torch.save(self.model, path)
+        else:
+            torch.save(self.model.state_dict(), path)
+        print(f"Model saved to {path}")
+
 
     def train(self, num_epochs=10):
         best_f1 = 0.0
@@ -123,6 +142,14 @@ class ModelTrainer:
                 if phase == 'val' and epoch_f1 > best_f1:
                     best_f1 = epoch_f1
                     best_model_wts = self.model.state_dict()
+
+                    # save the best model
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+                    try:
+                        self.save_model(os.path.join(current_dir, f"saved_models/{self.model.__class__.__name__}.pth"))
+                    except Exception as e:
+                        print(f"Error saving model to file: {e}")
         
         # Calculate total training time
         time_elapsed = time.time() - start_time

@@ -45,7 +45,7 @@ def run_main(model_name, model, hyperparams):
         # Extract labels for stratification
         train_labels = [seg['label'] for seg in train_segs]
         
-        # Get indices for stratified sampling
+        # Get indices for sampling
         train_indices = np.arange(len(train_segs))
         sampled_indices, _ = train_test_split(
             train_indices,
