@@ -42,7 +42,7 @@ class OpsSatDataLoader:
             })
         return segments
 
-    def get_train_test_segments(self):
+    def get_train_test_segments(self, **kwargs):
         if self.meta_df is None or self.seg_df is None:
             self.load_data()
         segments = self.get_segments()

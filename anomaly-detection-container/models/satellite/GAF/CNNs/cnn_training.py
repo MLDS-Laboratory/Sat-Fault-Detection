@@ -110,7 +110,7 @@ class ModelTrainer:
                 # Calculate epoch metrics
                 epoch_loss = running_loss / len(self.dataloaders[phase].dataset)
                 epoch_acc = accuracy_score(all_labels, all_preds)
-                epoch_f1 = f1_score(all_labels, all_preds, average='average')
+                epoch_f1 = f1_score(all_labels, all_preds, average='macro')
                 
                 # Store in history
                 self.history[f'{phase}_loss'].append(epoch_loss)
