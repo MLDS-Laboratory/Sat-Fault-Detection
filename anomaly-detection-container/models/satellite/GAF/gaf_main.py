@@ -8,6 +8,8 @@ from CNNs.scratch_cnn import CNNFromScratch
 from CNNs.cnn_training import ModelTrainer
 import torch.optim as optim
 from torch.utils.data import Subset
+import numpy as np
+from sklearn.model_selection import train_test_split
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
 # from pipelines.ops_sat_dataloader import OpsSatDataLoader
@@ -31,15 +33,55 @@ def run_main(model_name, model, hyperparams):
     print("Create dataloaders...")
     mission_dir = os.path.abspath(os.path.join(__file__, "../../../../data/ESA-Anomaly/ESA-Mission1"))
     loader = ESAMissionDataLoader(mission_dir=mission_dir)
-    
+
     print("Loading segments...")
     train_segs, test_segs = loader.get_train_test_segments()
 
-    train_segs = train_segs[:500000]  # For testing purposes
-    test_segs = test_segs[:100000]  # For testing purposes
+    print(f"Original train segments: {len(train_segs)}, Original test segments: {len(test_segs)}")
+
+    # Stratified sampling for training segments
+    MAX_TRAIN_SAMPLES = 500000
+    if len(train_segs) > MAX_TRAIN_SAMPLES:
+        # Extract labels for stratification
+        train_labels = [seg['label'] for seg in train_segs]
+        
+        # Get indices for stratified sampling
+        train_indices = np.arange(len(train_segs))
+        sampled_indices, _ = train_test_split(
+            train_indices,
+            test_size=(len(train_segs) - MAX_TRAIN_SAMPLES) / len(train_segs),
+            stratify=train_labels,
+            random_state=42
+        )
+        
+        # Get stratified sample
+        train_segs = [train_segs[i] for i in sampled_indices]
+        print(f"Sampled {len(train_segs)} train segments using stratified sampling")
+    
+    # Stratified sampling for test segments
+    MAX_TEST_SAMPLES = MAX_TRAIN_SAMPLES // 5
+    if len(test_segs) > MAX_TEST_SAMPLES:
+        # Extract labels for stratification
+        test_labels = [seg['label'] for seg in test_segs]
+        
+        # Get indices for stratified sampling
+        test_indices = np.arange(len(test_segs))
+        sampled_indices, _ = train_test_split(
+            test_indices, 
+            test_size=(len(test_segs) - MAX_TEST_SAMPLES) / len(test_segs),
+            stratify=test_labels,
+            random_state=42
+        )
+        
+        # Get stratified sample
+        test_segs = [test_segs[i] for i in sampled_indices]
+        print(f"Sampled {len(test_segs)} test segments using stratified sampling")
 
     # Print channel stats and distribution
     channel_stats = {}
+    anomaly_count = 0
+    total_count = len(train_segs)
+    
     for seg in train_segs:  
         ch = seg['channel']
         if ch not in channel_stats:
@@ -47,16 +89,19 @@ def run_main(model_name, model, hyperparams):
         
         if seg['label'] == 1:
             channel_stats[ch]['anomaly'] += 1
+            anomaly_count += 1
         else:
             channel_stats[ch]['normal'] += 1
         channel_stats[ch]['total'] += 1
 
+    print(f"Overall anomaly rate in training: {anomaly_count}/{total_count} ({anomaly_count/total_count*100:.2f}%)")
     print("Channel distribution in selected subset:")
-    for ch, stats in channel_stats.items():
-        print(f"Channel {ch}: {stats['total']} samples, {stats['anomaly']} anomalies ({stats['anomaly']/stats['total']*100:.2f}%)")
+    for ch, stats in sorted(channel_stats.items()):
+        if stats['total'] > 0:  # Avoid division by zero
+            print(f"Channel {ch}: {stats['total']} samples, {stats['anomaly']} anomalies ({stats['anomaly']/stats['total']*100:.2f}%)")
 
+    print(f"Final counts: {len(train_segs)} train segments, {len(test_segs)} test segments")
 
-    print(f"Train segments: {len(train_segs)}, Test segments: {len(test_segs)}")
     # Transforms
     tfms = {
         'train': transforms.Compose([
