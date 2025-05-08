@@ -40,7 +40,7 @@ def run_main(model_name, model, hyperparams):
     print(f"Original train segments: {len(train_segs)}, Original test segments: {len(test_segs)}")
 
     # Stratified sampling for training segments
-    MAX_TRAIN_SAMPLES = 500000
+    MAX_TRAIN_SAMPLES = 750000
     if len(train_segs) > MAX_TRAIN_SAMPLES:
         # Extract labels for stratification
         train_labels = [seg['label'] for seg in train_segs]

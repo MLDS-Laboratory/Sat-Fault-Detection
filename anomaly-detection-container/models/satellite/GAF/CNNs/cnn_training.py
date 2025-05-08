@@ -10,7 +10,7 @@ class ModelTrainer:
     Class to encapsulate training and evaluation routines for a given model.
     Records training and validation metrics per epoch for hyperparameter tuning.
     """
-    def __init__(self, model, dataloaders, criterion, optimizer, device, mixed_precision=True):
+    def __init__(self, model, dataloaders, criterion, optimizer, device, mixed_precision=False):
         self.model = model.to(device)
         self.dataloaders = dataloaders
         self.criterion = criterion
