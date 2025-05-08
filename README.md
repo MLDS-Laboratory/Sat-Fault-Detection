@@ -54,7 +54,7 @@ The entire pipeline allows for seamless data flow from simulation to storage, st
 
 1.  Clone the Repository:
 ```bash
-git clone https://github.com/varun-un/Sat-Fault-Detection.git 
+git clone https://github.com/MLDS-Laboratory/Sat-Fault-Detection.git 
 cd Sat-Fault-Detection
 ```
 2. Build and Start Containers:

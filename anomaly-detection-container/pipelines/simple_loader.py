@@ -25,7 +25,7 @@ def load_data(file_path: str) -> Union[pd.DataFrame, np.ndarray, dict]:
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 
-class DataLoader:
+class SimpleDataLoader:
     def __init__(self, data, batch_size=32, shuffle=True):
         """
         A simple DataLoader that supports pandas DataFrame, numpy arrays, and lists.

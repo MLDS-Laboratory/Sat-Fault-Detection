@@ -1,0 +1,9 @@
+# Ignore everything under the data folder
+data/**
+
+# But do not ignore directories under data (so Git can search subdirectories)
+!data/**/
+
+# Unignore any .py file in the data directory (and all subdirectories)
+!data/**/*.py
+
