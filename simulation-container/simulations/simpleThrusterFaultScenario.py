@@ -161,6 +161,8 @@ def simulate(plot):
     t2 = dv2 / (maxThrust / satellite.hub.mHub)
     totalTime = totalTime + macros.sec2nano(t1) + macros.sec2nano(t2)
 
+    fault = ThrusterFault(satSim, timestep, thFactory, thrusterSet, thrTimeMsg, thrTimeData, location, direction)
+    satSim.AddModelToTask(simTaskName, fault)
 
     # setup module that makes satellite point towards its velocity vector
     attGuidance = velocityPoint.velocityPoint()
@@ -295,6 +297,14 @@ def simulate(plot):
         plt.xlabel("Time [orbits]")
         plt.ylabel("Thrust [N]")
 
+        plt.figure(3)
+        for i in range(3):
+            plt.plot(satLog.times() * macros.NANO2SEC / period1, velo[:, i] / 1000,
+                        color=unitTestSupport.getLineColor(i, 3))
+        plt.title("Planet-relative Cartesian Velocity")
+        plt.legend(['vx', 'vy', 'vz'])
+        plt.xlabel("Time [orbits]")
+        plt.ylabel("Velocity [km/s]")
 
         plt.show()
     return
