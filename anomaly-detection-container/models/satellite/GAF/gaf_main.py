@@ -8,13 +8,11 @@ from CNNs.scratch_cnn import CNNFromScratch
 from CNNs.cnn_training import ModelTrainer
 import torch.optim as optim
 from torch.utils.data import Subset
-import numpy as np
-from sklearn.model_selection import train_test_split
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
 # from pipelines.ops_sat_dataloader import OpsSatDataLoader
 from pipelines.esa_dataloader import ESAMissionDataLoader
-from gaf_data_loader import GAFDataset
+from gaf_data_loader import GAFDataset, stratified_sample
 
 
 def run_main(model_name, model, hyperparams):
@@ -39,43 +37,8 @@ def run_main(model_name, model, hyperparams):
 
     print(f"Original train segments: {len(train_segs)}, Original test segments: {len(test_segs)}")
 
-    # Stratified sampling for training segments
-    MAX_TRAIN_SAMPLES = 750000
-    if len(train_segs) > MAX_TRAIN_SAMPLES:
-        # Extract labels for stratification
-        train_labels = [seg['label'] for seg in train_segs]
-        
-        # Get indices for sampling
-        train_indices = np.arange(len(train_segs))
-        sampled_indices, _ = train_test_split(
-            train_indices,
-            test_size=(len(train_segs) - MAX_TRAIN_SAMPLES) / len(train_segs),
-            stratify=train_labels,
-            random_state=42
-        )
-        
-        # Get stratified sample
-        train_segs = [train_segs[i] for i in sampled_indices]
-        print(f"Sampled {len(train_segs)} train segments using stratified sampling")
-    
-    # Stratified sampling for test segments
-    MAX_TEST_SAMPLES = MAX_TRAIN_SAMPLES // 5
-    if len(test_segs) > MAX_TEST_SAMPLES:
-        # Extract labels for stratification
-        test_labels = [seg['label'] for seg in test_segs]
-        
-        # Get indices for stratified sampling
-        test_indices = np.arange(len(test_segs))
-        sampled_indices, _ = train_test_split(
-            test_indices, 
-            test_size=(len(test_segs) - MAX_TEST_SAMPLES) / len(test_segs),
-            stratify=test_labels,
-            random_state=42
-        )
-        
-        # Get stratified sample
-        test_segs = [test_segs[i] for i in sampled_indices]
-        print(f"Sampled {len(test_segs)} test segments using stratified sampling")
+    # Limit the number of samples in train and test sets - good for large datasets (like ESA)
+    train_segs, test_segs = stratified_sample(train_segs, test_segs, max_train_samples=100000, max_test_samples=20000)
 
     # Print channel stats and distribution
     channel_stats = {}
@@ -167,8 +130,8 @@ def run_main(model_name, model, hyperparams):
 
 if __name__ == "__main__":
     # Example: single experiment
-    hp = dict(epochs=10, batch_size=32, lr=1e-3,
-              loss_fn=torch.nn.CrossEntropyLoss(), loss_name="CrossEntropy")
+    hp = dict(epochs=10, batch_size=32, lr=5e-3,
+              loss_fn=torch.nn.CrossEntropyLoss(label_smoothing=0.01), loss_name="CrossEntropy")
     # Model choice:
     # model = CNNFromScratch(num_classes=2, input_size=224); model_name="scratch"
     # or:
