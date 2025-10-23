@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # 1) Load your CSV
-csv_path = "grid_search_results.csv"  # adjust if needed
+csv_path = "outputs/ops_grid_search_results.csv"  # adjust if needed
 df = pd.read_csv(csv_path)
 
 # 2) Parse the list-columns into Python lists

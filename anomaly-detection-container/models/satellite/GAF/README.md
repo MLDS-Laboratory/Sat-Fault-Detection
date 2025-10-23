@@ -82,7 +82,7 @@ Real-world satellite data presents two major challenges:
 1. **Size**: Datasets can be enormous (millions of segments)
 2. **Imbalance**: Anomalies are rare (often <1% of the data)
 
-To address these challenges, the code includes powerful sampling strategies:
+To address these challenges, the code includes sampling strategies:
 
 1. **Stratified Sampling** (enabled by default for ESA on line 41)
    ```python
@@ -179,7 +179,7 @@ Tips for adjustment:
 - If training is slow, increase batch size (64 or 128) if your GPU has enough memory
 - If you see overfitting (validation loss increases while training loss decreases), try more label smoothing (0.05-0.1)
 
-For systematic hyperparameter tuning, use `grid_search.py`, which will test multiple combinations and find the best settings.
+For systematic hyperparameter tuning, use `hyperparam_search.py`, which will test multiple combinations and find the best settings.
 
 ## Caching
 
