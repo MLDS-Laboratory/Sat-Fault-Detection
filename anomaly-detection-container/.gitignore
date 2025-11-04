@@ -7,3 +7,6 @@ data/**
 # Unignore any .py file in the data directory (and all subdirectories)
 !data/**/*.py
 
+
+*.env
+.env/

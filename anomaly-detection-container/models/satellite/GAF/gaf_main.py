@@ -9,10 +9,11 @@ from CNNs.cnn_training import ModelTrainer
 import torch.optim as optim
 from torch.utils.data import Subset
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
+
 # from pipelines.ops_sat_dataloader import OpsSatDataLoader
 from pipelines.esa_dataloader import ESAMissionDataLoader
-from gaf_data_loader import GAFDataset, stratified_sample
+from models.satellite.GAF.gaf_data_loader import GAFDataset, stratified_sample
 
 
 def run_main(model_name, model, hyperparams):
