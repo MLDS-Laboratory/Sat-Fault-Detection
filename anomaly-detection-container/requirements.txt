@@ -10,3 +10,6 @@ scikit-learn
 scipy
 seaborn
 tqdm
+wandb
+sagemaker
+boto3
