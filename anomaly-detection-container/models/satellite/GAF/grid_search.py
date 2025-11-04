@@ -5,9 +5,9 @@ import torch
 # ensure imports work
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
-from gaf_main import run_main
-from CNNs.pretrained_resnet import get_pretrained_resnet
-from CNNs.scratch_cnn import CNNFromScratch
+from models.satellite.GAF.gaf_main import run_main
+from models.satellite.GAF.CNNs.pretrained_resnet import get_pretrained_resnet
+from models.satellite.GAF.CNNs.scratch_cnn import CNNFromScratch
 
 def grid_search(output_csv="grid_search_results.csv"):
     # Define hyperparameter grid
