@@ -21,7 +21,7 @@ ENV LC_ALL en_US.UTF-8
 
 # Install necessary packages for Basilisk / PostgreSQL / x11
 RUN apt-get update && \
-    apt-get install -y git build-essential python3 python3-setuptools python3-dev python3-pip python3.10-venv swig cmake \
+    apt-get install -y git build-essential python3 python3-setuptools python3-dev python3-pip python3.10-venv cmake \
     libpq-dev postgresql postgresql-contrib x11-apps python3-tk && \
     rm -rf /var/lib/apt/lists/*
 
@@ -33,7 +33,7 @@ WORKDIR /basilisk
 RUN python3 -m venv .venv
 
 # Activate the virtual environment and install pip dependencies for Basilisk
-RUN /bin/bash -c "source .venv/bin/activate && pip install --upgrade pip && pip install wheel 'conan' cmake packaging"
+RUN /bin/bash -c "source .venv/bin/activate && pip install --upgrade pip && pip install wheel 'conan' cmake packaging swig"
 
 # Initialize the default Conan profile for Basilisk
 RUN /bin/bash -c "source .venv/bin/activate && conan profile detect"
