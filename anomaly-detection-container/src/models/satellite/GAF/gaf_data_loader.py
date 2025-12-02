@@ -1,7 +1,7 @@
 import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
-from gaf_transform import compute_gaf  
+from models.satellite.GAF.gaf_transform import compute_gaf
 import os
 import time
 from functools import wraps
