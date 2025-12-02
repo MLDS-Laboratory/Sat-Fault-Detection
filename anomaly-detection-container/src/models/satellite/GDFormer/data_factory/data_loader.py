@@ -12,6 +12,8 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import pickle
 
+from pipelines.esa_dataloader import ESAMissionDataLoader
+
 class PSMSegLoader(object):
     def __init__(self, data_path, win_size, step, mode="train"):
         self.mode = mode
@@ -370,6 +372,138 @@ class NIPSSegLoader(Dataset):
                 self.test_labels[index // self.step * self.win_size:index // self.step * self.win_size + self.win_size])
 
 
+class ESASegLoader(Dataset):
+    """
+    Adapter that takes your ESAMissionDataLoader (segment-based)
+    and turns it into a GDFormer-style sliding-window dataset.
+
+    It treats each channel as a 1-D time series (input_c = 1)
+    and concatenates all segments into long 1-D sequences for
+    train/test, with per-sample labels for the test sequence.
+
+    Modes:
+        - train: sliding windows over nominal training data
+        - val:   sliding windows over the same distribution as test
+        - test:  sliding windows over test data (with labels aligned)
+        - thre:  non-overlapping windows over test data (for thresholding)
+    """
+
+    def __init__(
+        self,
+        mission_dir: str,
+        win_size: int,
+        step: int = 1,
+        mode: str = "train",
+        nominal_segment_len: int | None = None,
+        train_ratio: float = 0.8,
+        random_state: int = 42,
+        use_only_nominal_train: bool = True,
+    ):
+        super().__init__()
+        self.mode = mode
+        self.step = step
+        self.win_size = win_size
+        self.scaler = StandardScaler()
+
+        # -------------------------------
+        # 1) Load ESA segments
+        # -------------------------------
+        esa_loader = ESAMissionDataLoader(
+            mission_dir=mission_dir,
+            nominal_segment_len=nominal_segment_len,
+            train_ratio=train_ratio,
+            random_state=random_state,
+        )
+        train_segments, test_segments = esa_loader.get_train_test_segments()
+
+        # -------------------------------
+        # 2) Build long 1-D sequences
+        # -------------------------------
+
+        # Training data: by default, *only* nominal segments for unsupervised training
+        if use_only_nominal_train:
+            train_nominal = [s["ts"] for s in train_segments if s["label"] == 0]
+        else:
+            train_nominal = [s["ts"] for s in train_segments]
+
+        if len(train_nominal) == 0:
+            # Fallback: if for some reason there are no nominal segments
+            train_nominal = [s["ts"] for s in train_segments]
+
+        train_data = np.concatenate(train_nominal, axis=0).astype(np.float32)
+
+        # Test data: all segments, keep per-sample labels (segment label repeated)
+        test_series = []
+        test_labels = []
+        for s in test_segments:
+            ts = np.asarray(s["ts"], dtype=np.float32)
+            lbl = int(s["label"])
+            test_series.append(ts)
+            test_labels.append(np.full(len(ts), lbl, dtype=np.int64))
+
+        if len(test_series) == 0:
+            raise RuntimeError("No test segments found in ESA loader.")
+
+        test_data = np.concatenate(test_series, axis=0).astype(np.float32)
+        test_labels = np.concatenate(test_labels, axis=0).astype(np.int64)
+
+        # Shape to (N, 1) so enc_in = 1
+        train_data = train_data.reshape(-1, 1)
+        test_data = test_data.reshape(-1, 1)
+        test_labels = test_labels.reshape(-1, 1)
+
+        # -------------------------------
+        # 3) Standardize on train
+        # -------------------------------
+        self.scaler.fit(train_data)
+        train_data = self.scaler.transform(train_data)
+        test_data = self.scaler.transform(test_data)
+
+        # Following MSL/SMAP convention: val uses test distribution
+        self.train = train_data
+        self.val = test_data
+        self.test = test_data
+        self.test_labels = test_labels
+
+        print("ESA train:", self.train.shape)
+        print("ESA val:  ", self.val.shape)
+        print("ESA test: ", self.test.shape)
+
+    # ----------------------------------------------------
+    # Sliding window indexing – same semantics as GDFormer
+    # ----------------------------------------------------
+    def __len__(self):
+        if self.mode == "train":
+            return (self.train.shape[0] - self.win_size) // self.step + 1
+        elif self.mode == "val":
+            return (self.val.shape[0] - self.win_size) // self.step + 1
+        elif self.mode == "test":
+            return (self.test.shape[0] - self.win_size) // self.step + 1
+        else:
+            # 'thre' mode: non-overlapping windows over the test set
+            return (self.test.shape[0] - self.win_size) // self.win_size + 1
+
+    def __getitem__(self, index):
+        index = index * self.step
+        if self.mode == "train":
+            x = self.train[index:index + self.win_size]
+            # Training labels are unused in GDFormer; just give something of right shape
+            y = self.test_labels[0:self.win_size]
+        elif self.mode == "val":
+            x = self.val[index:index + self.win_size]
+            y = self.test_labels[0:self.win_size]
+        elif self.mode == "test":
+            x = self.test[index:index + self.win_size]
+            y = self.test_labels[index:index + self.win_size]
+        else:
+            # 'thre' – non-overlapping windows over the test set
+            base = (index // self.step) * self.win_size
+            x = self.test[base:base + self.win_size]
+            y = self.test_labels[base:base + self.win_size]
+
+        return np.float32(x), np.float32(y)
+
+
 
 
 def get_loader_segment(data_path, batch_size, win_size=100, step=100, mode='train', dataset='KDD'):
@@ -385,6 +519,18 @@ def get_loader_segment(data_path, batch_size, win_size=100, step=100, mode='trai
         dataset = SWATSegLoader(data_path, win_size, step, mode)
     elif (dataset == 'NIPS'):
         dataset = NIPSSegLoader(data_path, win_size, 1, mode)
+    elif (dataset == 'ESA'):
+        dataset = ESASegLoader(
+            mission_dir=data_path,
+            win_size=win_size,
+            step=1, 
+            mode=mode,
+            nominal_segment_len=None,
+            train_ratio=0.8,
+            random_state=42,
+            use_only_nominal_train=True,
+        )
+        
 
     shuffle = False
     if mode == 'train':
