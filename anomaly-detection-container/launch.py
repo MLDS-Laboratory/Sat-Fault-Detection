@@ -43,12 +43,14 @@ def run_sagemaker(a):
     if not a.data_dir.startswith("s3://"):
         data_input = sess.upload_data(path=a.data_dir, key_prefix="gaf-data")
 
+    code_dir = os.path.join(os.path.dirname(__file__), "src")
+
     estimator = PyTorch(
         entry_point="models/satellite/GAF/gaf_main.py",
-        source_dir=".",  # send whole repo
+        source_dir=code_dir,
         role=role,
-        framework_version="2.3",
-        py_version="py311",
+        framework_version="2.8",
+        py_version="py312",
         instance_type=a.instance_type,
         instance_count=1,
         hyperparameters={"epochs": a.epochs, "batch_size": a.batch_size, "lr": a.lr},
@@ -63,7 +65,8 @@ def run_sagemaker(a):
             "WANDB_RUN_GROUP": a.wandb_group,
         },
     )
-    estimator.fit({"train": TrainingInput(s3_data=data_input, input_mode=input_mode)})
+    print("Starting SageMaker training job...")
+    estimator.fit(inputs=TrainingInput(s3_data=data_input, input_mode=input_mode), logs=["All"])
 
 if __name__ == "__main__":
     args = parse()
