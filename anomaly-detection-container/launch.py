@@ -28,7 +28,7 @@ def run_local(a):
     os.environ["WANDB_PROJECT"] = a.wandb_project
     os.environ["WANDB_RUN_GROUP"] = a.wandb_group
     cmd = (
-        f"python models/satellite/GAF/gaf_main.py "
+        f"python src/models/satellite/GAF/gaf_main.py "
         f"--data_dir '{a.data_dir}' --epochs {a.epochs} --batch_size {a.batch_size} --lr {a.lr}"
     )
     raise SystemExit(os.system(cmd))
@@ -66,7 +66,7 @@ def run_sagemaker(a):
         },
     )
     print("Starting SageMaker training job...")
-    estimator.fit(inputs=TrainingInput(s3_data=data_input, input_mode=input_mode), logs=["All"])
+    estimator.fit(inputs={"train": TrainingInput(s3_data=data_input, input_mode=input_mode)}, logs=["All"])
 
 if __name__ == "__main__":
     args = parse()

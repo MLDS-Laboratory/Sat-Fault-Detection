@@ -10,6 +10,7 @@ def maybe_init_wandb(project: str = "gaf-anomaly-clf", config: dict | None = Non
         return run
     class _NoOp:
         def log(self, *a, **k): pass
+        def log_artifact(self, *a, **k): pass
         def finish(self): pass
         @property
         def config(self): return {}
