@@ -1,0 +1,18 @@
+# .sagemaker/ignore
+data/
+**/data/
+wandb/
+outputs/
+checkpoints/
+__pycache__/
+*.pt
+*.pth
+*.ckpt
+*.log
+*.tmp
+*.ipynb
+.env
+.venv/
+venv/
+.env*
+.git/

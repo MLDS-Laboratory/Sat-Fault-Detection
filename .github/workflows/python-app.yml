@@ -26,4 +26,5 @@ jobs:
 
     - name: Run centralized model tests
       run: |
-        python anomaly-detection-container/tests/all_tests.py
+        python anomaly-detection-container/src/tests/all_tests.py
+
