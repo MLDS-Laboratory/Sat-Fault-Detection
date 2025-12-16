@@ -10,3 +10,5 @@ data/**
 
 *.env
 .env/
+
+**/.idea/
