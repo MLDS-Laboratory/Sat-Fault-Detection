@@ -28,12 +28,14 @@ def predict_gaf_image(model, ts, device='cpu'):
     gaf_img = compute_gaf(ts)
     gaf_img = (gaf_img - gaf_img.min()) / (gaf_img.max() - gaf_img.min() + 1e-8)
     gaf_img = np.uint8(255 * gaf_img)
-    img = Image.fromarray(gaf_img).resize((224, 224)).convert("RGB")
     
-    # Apply transforms
+    # Convert to 1-channel Grayscale
+    img = Image.fromarray(gaf_img).resize((224, 224)).convert("L")
+    
+    # Apply 1-channel transforms
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize([0.5], [0.5])
     ])
     img_tensor = transform(img).unsqueeze(0).to(device)
     

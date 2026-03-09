@@ -193,4 +193,4 @@ class GAFDataset(Dataset):
         gaf_img = (gaf_img - gaf_img.min()) / (gaf_img.max() - gaf_img.min() + 1e-8)
         gaf_img = np.uint8(255 * gaf_img)
         img = Image.fromarray(gaf_img).resize((self.image_size, self.image_size))
-        return img.convert("RGB")
+        return img.convert("L")

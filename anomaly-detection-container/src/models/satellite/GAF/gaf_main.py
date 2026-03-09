@@ -35,14 +35,27 @@ def run_main(model_name, model, hyperparams, mission_dir):
     train_segs, test_segs = stratified_sample(train_segs, test_segs,
                                               max_train_samples=100000, max_test_samples=20000)
 
+    # RGB image transforms
+    # tfms = {
+    #     'train': transforms.Compose([
+    #         transforms.ToTensor(),
+    #         transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
+    #     ]),
+    #     'val': transforms.Compose([
+    #         transforms.ToTensor(),
+    #         transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
+    #     ])
+    # }
+
+    # grayscale transforms
     tfms = {
         'train': transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
+            transforms.Normalize([0.5], [0.5]) 
         ]),
         'val': transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
+            transforms.Normalize([0.5], [0.5]) 
         ])
     }
     full_train = GAFDataset(train_segs, transform=tfms['train'], cache_dir="/tmp/gaf_cache")

@@ -1,18 +1,35 @@
 from torchvision import models
 import torch.nn as nn
+import torch
+
+class ResNet1DWrapper(nn.Module):
+    """
+    Wraps a pretrained ResNet to accept 1-channel (grayscale) GAF images
+    by duplicating the single channel 3 times across the channel dimension.
+    """
+    def __init__(self, num_classes=2, freeze_early=True):
+        super(ResNet1DWrapper, self).__init__()
+        
+        # Load the base model
+        self.model = models.resnet18(pretrained=True)
+        
+        if freeze_early:
+            for param in self.model.parameters():
+                param.requires_grad = False
+                
+        # Replace final fully connected layer
+        num_ftrs = self.model.fc.in_features
+        self.model.fc = nn.Linear(num_ftrs, num_classes)
+        
+    def forward(self, x):
+        # x shape: [Batch, 1, Height, Width]
+        # Repeat the 1 channel 3 times to create [Batch, 3, Height, Width]
+        x = x.repeat(1, 3, 1, 1)
+        return self.model(x)
 
 
 def get_pretrained_resnet(num_classes=2, freeze_early=True):
     """
-    Load a pre-trained ResNet-18 model and replace the final FC layer.
-    freeze the early layers so only later layers are fine-tuned.
+    Load the wrapped pre-trained ResNet-18 model.
     """
-    model = models.resnet18(pretrained=True)
-    if freeze_early:
-        for param in model.parameters():
-            param.requires_grad = False
-
-    # replace final fully connected layer to match the target classes
-    num_ftrs = model.fc.in_features
-    model.fc = nn.Linear(num_ftrs, num_classes)
-    return model
+    return ResNet1DWrapper(num_classes=num_classes, freeze_early=freeze_early)
