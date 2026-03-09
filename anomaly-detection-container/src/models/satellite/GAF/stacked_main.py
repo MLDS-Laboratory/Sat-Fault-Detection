@@ -106,13 +106,12 @@ if __name__ == "__main__":
     mission_dir = data_dir(args.data_dir)
 
     # 1. Peek at the data to dynamically get the number of channels
-    temp_loader = ESAStackedDataLoader(mission_dir=mission_dir, nominal_segment_len=2048)
-    temp_train, _ = temp_loader.get_train_test_segments()
-    if not temp_train:
-        raise ValueError("No data found to determine in_channels.")
+    import pandas as pd
+    channels_csv_path = os.path.join(mission_dir, "channels.csv")
+    if not os.path.exists(channels_csv_path):
+        raise FileNotFoundError(f"Could not find {channels_csv_path} to determine channels.")
     
-    # Data shape is (Seq_Len, Channels)
-    in_channels = temp_train[0]['ts'].shape[1] 
+    in_channels = len(pd.read_csv(channels_csv_path)) - 1           # row 1 is header, so subtract it
     print(f"Detected {in_channels} channels for Stacked GAFs.")
 
     # 2. Check for Transfer Learning Weights (SageMaker mapped or Local)

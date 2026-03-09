@@ -49,7 +49,7 @@ class ESAStackedDataLoader:
             interval = ts_df.index.to_series().diff().dt.total_seconds().median()
             if pd.notna(interval): intervals.append(interval)
 
-        global_freq = f"{int(np.median(intervals))}S" if intervals else "1S"
+        global_freq = f"{int(np.median(intervals))}s" if intervals else "1s"
         
         # 2. Build the unified DataFrame via interpolation
         df_all = pd.DataFrame(all_series)
