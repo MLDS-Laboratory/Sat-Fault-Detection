@@ -81,7 +81,7 @@ class StackedGAFDataset(Dataset):
 
         # OPTIMIZATION: Downsample the 1D time series FIRST.
         # 1. Convert to tensor and reshape to (Batch=1, Channels, Seq_len)
-        ts_tensor = torch.from_numpy(ts_2d).float().t().unsqueeze(0)
+        ts_tensor = torch.from_numpy(ts_2d.copy()).float().t().unsqueeze(0)
         
         # 2. Interpolate the time series down to exactly `image_size` (e.g., 224 points)
         ts_downsampled = F.interpolate(ts_tensor, size=self.image_size, mode='linear', align_corners=False)

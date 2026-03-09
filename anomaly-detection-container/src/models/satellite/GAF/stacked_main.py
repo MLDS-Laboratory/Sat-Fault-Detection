@@ -111,7 +111,7 @@ if __name__ == "__main__":
     if not os.path.exists(channels_csv_path):
         raise FileNotFoundError(f"Could not find {channels_csv_path} to determine channels.")
     
-    in_channels = len(pd.read_csv(channels_csv_path)) - 1           # row 1 is header, so subtract it
+    in_channels = len(pd.read_csv(channels_csv_path))
     print(f"Detected {in_channels} channels for Stacked GAFs.")
 
     # 2. Check for Transfer Learning Weights (SageMaker mapped or Local)
