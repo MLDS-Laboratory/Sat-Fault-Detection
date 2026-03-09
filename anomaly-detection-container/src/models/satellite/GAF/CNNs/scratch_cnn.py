@@ -14,10 +14,13 @@ class CNNFromScratch(nn.Module):
             nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),  
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
+
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
+
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),        # resnet uses this, so makes comparison fairer - helps normalize (free var is just residuals now)
             nn.ReLU(inplace=True),
             # Ensures output is always 7x7 before the classifier
             nn.AdaptiveAvgPool2d((7, 7)) 

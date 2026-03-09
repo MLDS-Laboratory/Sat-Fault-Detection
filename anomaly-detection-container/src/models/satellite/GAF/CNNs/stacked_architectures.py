@@ -30,6 +30,7 @@ class StackedScratchCNN(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),        # resnet uses this, so makes comparison fairer - helps normalize (free var is just residuals now)
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool2d((7, 7)) 
         )

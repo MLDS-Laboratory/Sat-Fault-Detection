@@ -94,5 +94,5 @@ python launch.py --mode local --data_dir data/ESA-Anomaly/ESA-Mission1 --epochs 
 
 python launch.py --mode sagemaker --fastfile --instance_type ml.g5.24xlarge --data_dir s3://mlds-anom-esa/data/ESA-Mission1
 
-python launch.py --mode sagemaker --fastfile --instance_type ml.g5.24xlarge --model scratch--data_dir s3://mlds-anom-esa/data/ESA-Mission1
+python launch.py --mode sagemaker --fastfile --instance_type ml.g5.24xlarge --model scratch --data_dir s3://mlds-anom-esa/data/ESA-Mission1
 """
