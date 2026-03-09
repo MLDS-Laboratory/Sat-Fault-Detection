@@ -24,6 +24,8 @@ def parse():
     p.add_argument("--wandb_project", default="gaf-anomaly-clf")
     p.add_argument("--wandb_group", default="baseline")
     p.add_argument("--volume_size", type=int, default=200)  # GB
+    p.add_argument("--run_type", choices=["1d", "stacked"], default="1d")
+    p.add_argument("--transfer_weights", type=str, default=None, help="S3 or local path to .pth file")
     return p.parse_args()
 
 def run_local(a):
@@ -47,8 +49,19 @@ def run_sagemaker(a):
 
     code_dir = os.path.join(os.path.dirname(__file__), "src")
 
+    # SageMaker Inputs Dictionary
+    inputs = {"train": TrainingInput(s3_data=data_input, input_mode=input_mode)}
+    
+    # If transfer learning, attach the weights as a secondary channel
+    if a.transfer_weights:
+        weights_input = a.transfer_weights if a.transfer_weights.startswith("s3://") else sess.upload_data(path=a.transfer_weights, key_prefix="gaf-weights")
+        inputs["weights"] = TrainingInput(s3_data=weights_input, input_mode="File")
+
+    # Point to the correct entry script based on run_type
+    entry = "models/satellite/GAF/stacked_main.py" if a.run_type == "stacked" else "models/satellite/GAF/gaf_main.py"
+
     estimator = PyTorch(
-        entry_point="models/satellite/GAF/gaf_main.py",
+        entry_point=entry,
         source_dir=code_dir,
         role=role,
         framework_version="2.8",
