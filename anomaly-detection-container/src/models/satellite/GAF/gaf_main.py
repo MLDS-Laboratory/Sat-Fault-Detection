@@ -31,7 +31,7 @@ def run_main(model_name, model, hyperparams, mission_dir):
     loader = ESAMissionDataLoader(mission_dir=mission_dir)
     train_segs, test_segs = loader.get_train_test_segments()
 
-    # Down/select (you can tweak these caps)
+    # Down/select
     train_segs, test_segs = stratified_sample(train_segs, test_segs,
                                               max_train_samples=100000, max_test_samples=20000)
 
@@ -45,8 +45,8 @@ def run_main(model_name, model, hyperparams, mission_dir):
             transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
         ])
     }
-    full_train = GAFDataset(train_segs, transform=tfms['train'])
-    test_ds    = GAFDataset(test_segs,  transform=tfms['val'])
+    full_train = GAFDataset(train_segs, transform=tfms['train'], cache_dir="/tmp/gaf_cache")
+    test_ds    = GAFDataset(test_segs,  transform=tfms['val'], cache_dir="/tmp/gaf_cache")
 
     n = len(full_train); split = int(0.8*n)
     train_ds = Subset(full_train, list(range(split)))
@@ -54,9 +54,9 @@ def run_main(model_name, model, hyperparams, mission_dir):
 
     bs = hyperparams['batch_size']
     dataloaders = {
-        'train': DataLoader(train_ds, batch_size=bs, shuffle=True,  num_workers=10, pin_memory=True),
-        'val':   DataLoader(val_ds,   batch_size=bs, shuffle=False, num_workers=10, pin_memory=True),
-        'test':  DataLoader(test_ds,  batch_size=bs, shuffle=False, num_workers=10, pin_memory=True),
+        'train': DataLoader(train_ds, batch_size=bs, shuffle=True,  num_workers=4, pin_memory=False, prefetch_factor=1),
+        'val':   DataLoader(val_ds,   batch_size=bs, shuffle=False, num_workers=4, pin_memory=False, prefetch_factor=1),
+        'test':  DataLoader(test_ds,  batch_size=bs, shuffle=False, num_workers=4, pin_memory=False, prefetch_factor=1),
     }
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

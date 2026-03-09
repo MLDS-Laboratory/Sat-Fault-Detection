@@ -12,16 +12,18 @@ load_dotenv()
 
 def parse():
     p = argparse.ArgumentParser()
-    p.add_argument("--mode", choices=["local","sagemaker"], default="local")
+    p.add_argument("--mode", choices=["local","sagemaker"], default="sagemaker")
     p.add_argument("--data_dir", default="data/ESA-Anomaly/ESA-Mission1")
-    p.add_argument("--epochs", type=int, default=10)
-    p.add_argument("--batch_size", type=int, default=32)
+    p.add_argument("--epochs", type=int, default=10)                # time bottleneck
+    p.add_argument("--batch_size", type=int, default=64)            # memory bottleneck
     p.add_argument("--lr", type=float, default=5e-3)
-    p.add_argument("--instance_type", default="ml.g5.2xlarge")
+    p.add_argument("--model", choices=["pretrained", "scratch"], default="pretrained")
+    p.add_argument("--instance_type", default="ml.g5.12xlarge")
     p.add_argument("--spot", action="store_true")
     p.add_argument("--fastfile", action="store_true")
     p.add_argument("--wandb_project", default="gaf-anomaly-clf")
     p.add_argument("--wandb_group", default="baseline")
+    p.add_argument("--volume_size", type=int, default=200)  # GB
     return p.parse_args()
 
 def run_local(a):
@@ -29,7 +31,7 @@ def run_local(a):
     os.environ["WANDB_RUN_GROUP"] = a.wandb_group
     cmd = (
         f"python src/models/satellite/GAF/gaf_main.py "
-        f"--data_dir '{a.data_dir}' --epochs {a.epochs} --batch_size {a.batch_size} --lr {a.lr}"
+        f"--data_dir '{a.data_dir}' --epochs {a.epochs} --batch_size {a.batch_size} --lr {a.lr} --model {a.model}"
     )
     raise SystemExit(os.system(cmd))
 
@@ -53,7 +55,8 @@ def run_sagemaker(a):
         py_version="py312",
         instance_type=a.instance_type,
         instance_count=1,
-        hyperparameters={"epochs": a.epochs, "batch_size": a.batch_size, "lr": a.lr},
+        volume_size=a.volume_size,
+        hyperparameters={"epochs": a.epochs, "batch_size": a.batch_size, "lr": a.lr, "model": a.model},
         requirements_file="requirements.txt",
         enable_sagemaker_metrics=True,
         use_spot_instances=a.spot,
@@ -76,5 +79,7 @@ if __name__ == "__main__":
 """
 python launch.py --mode local --data_dir data/ESA-Anomaly/ESA-Mission1 --epochs 5
 
-python launch.py --mode sagemaker --fastfile --instance_type ml.g5.2xlarge --data_dir s3://mlds-anom-esa/data/ESA-Mission1
+python launch.py --mode sagemaker --fastfile --instance_type ml.g5.24xlarge --data_dir s3://mlds-anom-esa/data/ESA-Mission1
+
+python launch.py --mode sagemaker --fastfile --instance_type ml.g5.24xlarge --model scratch--data_dir s3://mlds-anom-esa/data/ESA-Mission1
 """
