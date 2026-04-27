@@ -12,3 +12,6 @@ data/**
 .env/
 
 **/.idea/
+
+viz/*
+viz/**/*.py

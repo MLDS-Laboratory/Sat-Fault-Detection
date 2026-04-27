@@ -8,8 +8,7 @@ from matplotlib.gridspec import GridSpec
 from gaf_transform import compute_gaf
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
-from pipelines.ops_sat_dataloader import OpsSatDataLoader
-
+from pipelines.esa_dataloader import ESAMissionDataLoader
 def visualize_single_gaf(segment, image_size=224, save_path=None):
     """
     Visualize a single GAF image along with its original time series.
@@ -30,9 +29,10 @@ def visualize_single_gaf(segment, image_size=224, save_path=None):
     # Plot original time series
     plt.subplot(1, 2, 1)
     plt.plot(ts)
-    plt.title(f"Original Time Series\nSegment {segment['segment']}, Channel: {channel}")
-    plt.xlabel("Time")
-    plt.ylabel("Value")
+    plt.title(f"Original Time Series\nSegment {segment['segment']}, Channel: {channel}", 
+              fontsize=16, fontweight='bold')
+    plt.xlabel("Time", fontsize=15, fontweight='bold')
+    plt.ylabel("Value", fontsize=15, fontweight='bold')
     
     # Compute and display GAF
     gaf_img = compute_gaf(ts)
@@ -41,9 +41,12 @@ def visualize_single_gaf(segment, image_size=224, save_path=None):
     gaf_img = (gaf_img - gaf_img.min()) / (gaf_img.max() - gaf_img.min() + 1e-8)
     
     plt.subplot(1, 2, 2)
-    plt.imshow(gaf_img, cmap='viridis')
-    plt.colorbar()
-    plt.title(f"GAF Image - Label: {label_str}")
+    # aspect='auto' forces the image to stretch and match the line plot's dimensions
+    im = plt.imshow(gaf_img, cmap='viridis', aspect='auto') 
+    plt.colorbar(im)
+    plt.title(f"GAF Image - Label: {label_str}", fontsize=16, fontweight='bold')
+    plt.xlabel("Time Step", fontsize=15, fontweight='bold')
+    plt.ylabel("Time Step", fontsize=15, fontweight='bold')
     
     # Print segment details
     print(f"Segment ID: {segment['segment']}")
@@ -53,7 +56,7 @@ def visualize_single_gaf(segment, image_size=224, save_path=None):
     plt.tight_layout()
     
     if save_path:
-        fig.savefig(f"{save_path}_raw.png")
+        fig.savefig(f"{save_path}_raw.png", dpi=300) # Added dpi=300 for higher quality text
         print(f"Images saved to {save_path}_raw.png and {save_path}_processed.png")
     
     return fig
@@ -154,57 +157,57 @@ def visualize_grid_with_timeseries(segments, grid_size=(4, 4), start_idx=0, save
         print(f"Detail grid saved to {save_path}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Visualize GAF images from ESA-ADB dataset.')
     
-    parser = argparse.ArgumentParser(description='Visualize GAF images from OPS-SAT dataset.')
-    parser.add_argument('--dataset_csv', type=str, 
-                      default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/OPS-SAT/dataset.csv")), 
-                      help='Path to dataset.csv')
-    parser.add_argument('--segment_csv', type=str, 
-                      default=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/OPS-SAT/segments.csv")), 
-                      help='Path to segments.csv')
+    # 1. Replaced OPS-SAT CSV arguments with ESA Mission Directory argument
+    parser.add_argument('--mission_dir', type=str, 
+                        default=os.path.abspath(os.path.join(__file__, "../../../../../data/ESA-Anomaly/ESA-Mission1")),
+                        help='Path to the mission directory containing channels/, labels.csv, etc.')
     parser.add_argument('--segment_idx', type=int, default=0, 
-                      help='Index of segment to visualize (for single visualization)')
+                        help='Index of segment to visualize (for single visualization)')
     parser.add_argument('--mode', type=str, choices=['single', 'grid', 'detailed_grid'], 
-                      default='single', help='Visualization mode')
+                        default='single', help='Visualization mode')
     parser.add_argument('--grid_size', type=int, nargs=2, default=[8, 8], 
-                      help='Grid dimensions as rows cols (e.g., 8 8 for 8x8 grid)')
+                        help='Grid dimensions as rows cols (e.g., 8 8 for 8x8 grid)')
     parser.add_argument('--start_idx', type=int, default=0, 
-                      help='Starting index for grid visualization')
+                        help='Starting index for grid visualization')
     parser.add_argument('--save', type=str, default=None, 
-                      help='Path to save visualization')
+                        help='Path to save visualization')
     parser.add_argument('--show_anomalies_only', action='store_true', 
-                      help='Only show anomalous segments in grid view')
+                        help='Only show anomalous segments in grid view')
     args = parser.parse_args()
     
-    # Convert relative paths to absolute paths if needed
-    dataset_csv = args.dataset_csv
-    segment_csv = args.segment_csv
-    if not os.path.isabs(dataset_csv):
+    # Resolve absolute path for mission directory
+    mission_dir = args.mission_dir
+    if not os.path.isabs(mission_dir):
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        dataset_csv = os.path.abspath(os.path.join(current_dir, dataset_csv))
-    if not os.path.isabs(segment_csv):
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        segment_csv = os.path.abspath(os.path.join(current_dir, segment_csv))
+        mission_dir = os.path.abspath(os.path.join(current_dir, mission_dir))
+        
+    print(f"Loading ESA dataset from: {mission_dir}")
     
-    # Print paths to help with debugging
-    print(f"Loading dataset from: {dataset_csv}")
-    print(f"Loading segments from: {segment_csv}")
+    # 2. Initialize the ESA DataLoader
+    # Ensure you import ESAMissionDataLoader at the top of your script
+    data_loader = ESAMissionDataLoader(mission_dir=mission_dir)
     
-    # Load data
-    data_loader = OpsSatDataLoader(dataset_csv, segment_csv)
-    all_segments = data_loader.get_segments()
+    # 3. Trigger segment generation and retrieve the segments list
+    data_loader.get_train_test_segments()
+    all_segments = data_loader.segments
     
+    if not all_segments:
+        print("Error: No segments found. Check your data path and ensure channels are populated.")
+        exit(1)
+        
     # Filter for anomalies if requested
     if args.show_anomalies_only and args.mode != 'single':
         all_segments = [s for s in all_segments if s['label'] == 1]
         print(f"Showing only anomalous segments ({len(all_segments)} total)")
-    
+        
     if args.mode == 'single':
         # Validate segment_idx
         if args.segment_idx < 0 or args.segment_idx >= len(all_segments):
             print(f"Error: segment_idx must be between 0 and {len(all_segments)-1}")
             exit(1)
-        
+            
         # Visualize single segment
         visualize_single_gaf(all_segments[args.segment_idx], save_path=args.save)
         
@@ -218,10 +221,9 @@ if __name__ == "__main__":
         # Use smaller grid for detailed view
         rows, cols = min(args.grid_size[0], 5), min(args.grid_size[1], 5)
         visualize_grid_with_timeseries(all_segments, grid_size=(rows, cols), 
-                                    start_idx=args.start_idx, save_path=args.save)
+                                       start_idx=args.start_idx, save_path=args.save)
     
     plt.show()
-
 
 
 # ----------- Example usage: ------------------------
