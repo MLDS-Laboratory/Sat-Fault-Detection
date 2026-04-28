@@ -18,7 +18,7 @@ def parse_args():
     p.add_argument("--data_dir", type=str, default=os.path.abspath(os.path.join(__file__, "../../../../data/ESA-Anomaly/ESA-Mission1")))
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--batch_size", type=int, default=32)
-    p.add_argument("--lr", type=float, default=5e-5)
+    p.add_argument("--lr", type=float, default=2e-4) # Fix 2 — Increase LR back to 2e-4
     p.add_argument("--model", choices=["pretrained","scratch"], default="pretrained")
     p.add_argument("--mixed_precision", action="store_true")
     return p.parse_args()
@@ -29,20 +29,9 @@ def run_main(model_name, model, hyperparams, mission_dir):
     train_segs, test_segs = loader.get_train_test_segments()
 
     # Down/select
-    train_segs, test_segs = stratified_sample(train_segs, test_segs, max_train_samples=200000, 
-                                              max_test_samples=40000, oversample_anomaly=False)
-
-    # RGB image transforms
-    # tfms = {
-    #     'train': transforms.Compose([
-    #         transforms.ToTensor(),
-    #         transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
-    #     ]),
-    #     'val': transforms.Compose([
-    #         transforms.ToTensor(),
-    #         transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
-    #     ])
-    # }
+    train_segs, test_segs = stratified_sample(train_segs, test_segs,
+                                              max_train_samples=100000, max_test_samples=20000, 
+                                              oversample_anomaly=False)
 
     # grayscale transforms
     tfms = {
@@ -72,6 +61,9 @@ def run_main(model_name, model, hyperparams, mission_dir):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     criterion = hyperparams['loss_fn']
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=hyperparams['lr'])
+    
+    # Fix 3 — Add a cosine annealing scheduler
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30, eta_min=1e-5)
 
     # W&B init (no-op if no WANDB_API_KEY)
     run = maybe_init_wandb(project="gaf-anomaly-clf", config={
@@ -80,9 +72,10 @@ def run_main(model_name, model, hyperparams, mission_dir):
 
     trainer = ModelTrainer(model, dataloaders, criterion, optimizer, device,
                            mixed_precision=hyperparams.get('mixed_precision', False),
-                           wandb_run=run)
+                           wandb_run=run, scheduler=scheduler)
 
-    model_trained, history = trainer.train(num_epochs=hyperparams['epochs'])
+    # Using accumulation_steps=64 to ensure soft-F0.5 buffer hits min_positives=5 regularly
+    model_trained, history = trainer.train(num_epochs=hyperparams['epochs'], accumulation_steps=64)
     test_acc, test_f05, test_cm = trainer.evaluate(phase='test')
 
     from utils.env_utils import model_dir

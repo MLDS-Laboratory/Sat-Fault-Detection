@@ -7,7 +7,7 @@ import numpy as np
 from utils.env_utils import model_dir, ensure_dir
 
 class ModelTrainer:
-    def __init__(self, model, dataloaders, criterion, optimizer, device, mixed_precision=False, wandb_run=None):
+    def __init__(self, model, dataloaders, criterion, optimizer, device, mixed_precision=False, wandb_run=None, scheduler=None):
         self.model = model.to(device)
         self.dataloaders = dataloaders
         self.criterion = criterion
@@ -15,6 +15,7 @@ class ModelTrainer:
         self.device = device
         self.mixed_precision = mixed_precision
         self.wandb = wandb_run  # can be a no-op
+        self.scheduler = scheduler
         self.best_threshold = 0.5
 
         self.history = {
@@ -51,7 +52,7 @@ class ModelTrainer:
         print(f"Model saved to {path}")
         return path
 
-    def train(self, num_epochs=10):
+    def train(self, num_epochs=10, accumulation_steps=1):
         best_f05 = 0.0
         best_model_wts = None
 
@@ -76,12 +77,17 @@ class ModelTrainer:
                 all_preds, all_labels = [], []
                 all_proba = []
                 total_batches = len(self.dataloaders[phase])
+                
+                epoch_total_norm = 0.0
+                num_grad_steps = 0
 
                 with tqdm(total=total_batches, desc=f'{phase.capitalize()}', ncols=100) as pbar:
                     t0 = time.time()
                     for i, (inputs, labels) in enumerate(self.dataloaders[phase]):
                         inputs, labels = inputs.to(self.device), labels.to(self.device)
-                        self.optimizer.zero_grad(set_to_none=True)
+                        
+                        if phase == 'train' and i % accumulation_steps == 0:
+                            self.optimizer.zero_grad(set_to_none=True)
 
                         with torch.set_grad_enabled(phase == 'train'):
 
@@ -97,8 +103,8 @@ class ModelTrainer:
                                     loss = self.criterion(outputs, labels)
                                 
                                 if phase == 'train':
-                                    loss.backward()
-                                    self.optimizer.step()
+                                    # Normalize loss for accumulation
+                                    (loss / accumulation_steps).backward()
                             else:
                                 with torch.cuda.amp.autocast("cuda"):
                                     outputs = self.model(inputs)
@@ -110,20 +116,36 @@ class ModelTrainer:
                                         loss = self.criterion(outputs, labels)
                                 
                                 if phase == 'train':
-                                    scaler.scale(loss).backward()
+                                    scaler.scale(loss / accumulation_steps).backward()
+                        
+                        if phase == 'train':
+                            if (i + 1) % accumulation_steps == 0 or (i + 1) == total_batches:
+                                # Add a gradient norm log
+                                if scaler is None:
+                                    total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                                    self.optimizer.step()
+                                else:
+                                    scaler.unscale_(self.optimizer)
+                                    total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                                     scaler.step(self.optimizer)
                                     scaler.update()
-                        
+                                
+                                epoch_total_norm += total_norm.item()
+                                num_grad_steps += 1
+                                
+                                # Reset buffer after gradient step
+                                if hasattr(self.criterion, 'reset_buffer'):
+                                    self.criterion.reset_buffer()
+                                
+                                global_step += 1
+                                if self.wandb:
+                                    self.wandb.log({"train/loss_step": float(loss.item()), "train/grad_norm": total_norm.item()})
+
                         # Update statistics
                         running_loss += loss.item() * inputs.size(0)
                         all_preds.extend(preds.detach().cpu().numpy())
                         all_labels.extend(labels.detach().cpu().numpy())
                         all_proba.extend(proba.detach().cpu().numpy())
-
-                        if phase == 'train':
-                            global_step += 1
-                            if self.wandb:
-                                self.wandb.log({"train/loss_step": float(loss.item())})
 
                         pbar.set_postfix({'loss': f'{loss.item():.4f}',
                                           'ETA': f'{(time.time()-t0)/(i+1)*(total_batches-i-1):.1f}s'})
@@ -154,6 +176,9 @@ class ModelTrainer:
                     f"{phase}/f1": epoch_f1,
                     "epoch": epoch
                 }
+                
+                if phase == 'train' and num_grad_steps > 0:
+                    log_dict["train/avg_grad_norm"] = epoch_total_norm / num_grad_steps
 
                 if phase == 'val':
                     metrics = self.compute_sample_f05(np.array(all_labels), np.array(all_proba), threshold=0.5)
@@ -180,6 +205,12 @@ class ModelTrainer:
                     self.wandb.log(log_dict)
 
             # end phases
+            # Fix 3 — Call scheduler.step() at the end of each epoch
+            if self.scheduler:
+                self.scheduler.step()
+                if self.wandb:
+                    self.wandb.log({"train/lr": self.optimizer.param_groups[0]['lr'], "epoch": epoch})
+
         print(f"\nTraining complete in {(time.time()-start_time)//60:.0f}m {(time.time()-start_time)%60:.0f}s")
         print(f"Best val F0.5: {best_f05:.4f}")
 

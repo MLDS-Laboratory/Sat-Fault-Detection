@@ -17,7 +17,7 @@ def parse_args():
     p.add_argument("--data_dir", type=str, default=os.path.abspath(os.path.join(__file__, "../../../../data/ESA-Anomaly/ESA-Mission1")))
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--batch_size", type=int, default=32)
-    p.add_argument("--lr", type=float, default=5e-5)
+    p.add_argument("--lr", type=float, default=2e-4) # Fix 2 — Increase LR back to 2e-4
     p.add_argument("--model", choices=["pretrained","scratch"], default="pretrained")
     p.add_argument("--mixed_precision", action="store_true")
     p.add_argument("--local_weights", type=str, default=None, help="Local path to weights for transfer learning")
@@ -28,7 +28,7 @@ def run_main(model_name, model, hyperparams, mission_dir):
     loader = ESAStackedDataLoader(mission_dir=mission_dir, nominal_segment_len=2048)
     train_segs, test_segs = loader.get_train_test_segments()
 
-    # DYNAMIC DOWNSAMPLING: Adjust limits based on channel count
+    # DYNAMIC DOWNSAMPLING
     in_channels = train_segs[0]['ts'].shape[1] 
     base_train_max = 100000
     base_test_max = 20000
@@ -37,9 +37,7 @@ def run_main(model_name, model, hyperparams, mission_dir):
     actual_test_max = base_test_max // in_channels
     print(f"Adjusting max segments for {in_channels} channels: Train limit={actual_train_max}, Test limit={actual_test_max}")
 
-    # Step 1 — Disable oversampling. (By setting min_anomaly_pct=0.0 and knowing default behavior)
-    # Actually, stacked_stratified_sample always does some sampling. 
-    # To disable oversampling/forcing anomaly share, we can set min_anomaly_pct=0.0
+    # Step 1 — Disable oversampling
     train_segs, test_segs = stacked_stratified_sample(
         train_segs, test_segs, 
         max_train_samples=actual_train_max, 
@@ -66,6 +64,9 @@ def run_main(model_name, model, hyperparams, mission_dir):
     
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = optim.Adam(trainable_params, lr=hyperparams['lr'])
+    
+    # Fix 3 — Add a cosine annealing scheduler
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30, eta_min=1e-5)
 
     run = maybe_init_wandb(project="gaf-anomaly-clf", config={
         "arch": model_name, "epochs": hyperparams['epochs'], "batch_size": bs, "lr": hyperparams['lr'], "type": "stacked"
@@ -73,9 +74,10 @@ def run_main(model_name, model, hyperparams, mission_dir):
 
     trainer = ModelTrainer(model, dataloaders, criterion, optimizer, device,
                            mixed_precision=hyperparams.get('mixed_precision', False),
-                           wandb_run=run)
+                           wandb_run=run, scheduler=scheduler)
 
-    model_trained, history = trainer.train(num_epochs=hyperparams['epochs'])
+    # Using accumulation_steps=64 to ensure soft-F0.5 buffer hits min_positives=5 regularly
+    model_trained, history = trainer.train(num_epochs=hyperparams['epochs'], accumulation_steps=64)
     test_acc, test_f05, test_cm = trainer.evaluate(phase='test')
 
     best_path = os.path.join(model_dir(), f"{model.__class__.__name__}_best.pth")
