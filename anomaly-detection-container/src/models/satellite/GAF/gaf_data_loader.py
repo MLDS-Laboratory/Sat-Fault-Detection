@@ -20,7 +20,7 @@ def timeit(func):
     return wrapper
 
 def stratified_sample(train_segs, test_segs, max_train_samples, max_test_samples, *,
-        oversample_anomaly=True, min_anomaly_pct=0.15, random_state=42):
+        oversample_anomaly=True, min_anomaly_pct=0.05, random_state=42):
     """
     Stratified sampling for train / test sets.
 
@@ -36,7 +36,7 @@ def stratified_sample(train_segs, test_segs, max_train_samples, max_test_samples
         If True, the returned *train* split is forced to contain at least
         `min_anomaly_pct` anomalies (duplicates allowed when the corpus
         does not have enough unique anomalies).
-    min_anomaly_pct : float, default 0.15
+    min_anomaly_pct : float
         Desired minimum anomaly share for the training set.
     random_state : int, default 42
         Reproducible RNG seed.

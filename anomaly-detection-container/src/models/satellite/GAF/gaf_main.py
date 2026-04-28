@@ -33,7 +33,7 @@ def run_main(model_name, model, hyperparams, mission_dir):
 
     # Down/select
     train_segs, test_segs = stratified_sample(train_segs, test_segs,
-                                              max_train_samples=100000, max_test_samples=20000)
+                                              max_train_samples=100000, max_test_samples=20000, oversample_anomaly=False)
 
     # RGB image transforms
     # tfms = {
