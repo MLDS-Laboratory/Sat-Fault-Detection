@@ -23,7 +23,7 @@ def parse():
     p.add_argument("--fastfile", action="store_true")
     p.add_argument("--wandb_project", default="gaf-anomaly-clf")
     p.add_argument("--wandb_group", default="baseline")
-    p.add_argument("--volume_size", type=int, default=200)  # GB
+    p.add_argument("--volume_size", type=int, default=256)  # GB
     p.add_argument("--run_type", choices=["1d", "stacked"], default="1d")
     p.add_argument("--transfer_weights", type=str, default=None, help="S3 or local path to .pth file")
     return p.parse_args()

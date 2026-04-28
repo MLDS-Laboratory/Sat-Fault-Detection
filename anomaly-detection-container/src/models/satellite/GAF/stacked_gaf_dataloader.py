@@ -8,7 +8,7 @@ from models.satellite.GAF.gaf_transform import compute_gaf
 from sklearn.model_selection import train_test_split
 
 
-def stacked_stratified_sample(train_segs, test_segs, max_train_samples, max_test_samples, min_anomaly_pct=0.15, random_state=42):
+def stacked_stratified_sample(train_segs, test_segs, max_train_samples, max_test_samples, min_anomaly_pct=0.05, random_state=42):
     """
     Stratified sampler for Stacked GAFs. Ensures the training set has a minimum 
     percentage of anomalies, oversampling if necessary.

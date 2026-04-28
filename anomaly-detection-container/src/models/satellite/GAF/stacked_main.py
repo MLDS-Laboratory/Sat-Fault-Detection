@@ -8,6 +8,7 @@ from pipelines.esa_stacked_dataloader import ESAStackedDataLoader
 from models.satellite.GAF.stacked_gaf_dataloader import StackedGAFDataset, stacked_stratified_sample
 from models.satellite.GAF.CNNs.stacked_architectures import load_transfer_model, StackedResNet, StackedScratchCNN
 from models.satellite.GAF.CNNs.cnn_training import ModelTrainer
+from utils.losses import CompoundLoss
 from utils.env_utils import data_dir, model_dir
 from utils.wandb_utils import maybe_init_wandb, log_best_model_as_artifact
 
@@ -141,6 +142,6 @@ if __name__ == "__main__":
 
     hp = dict(
         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, mixed_precision=args.mixed_precision,
-        loss_fn=torch.nn.CrossEntropyLoss(label_smoothing=0.01), loss_name="CrossEntropy"
+        loss_fn=CompoundLoss(focal_weight=0.7, f05_weight=0.3, gamma_neg=2.0, alpha=0.25), loss_name="CompoundLoss"
     )
     res = run_main(model_name, model, hp, mission_dir=mission_dir)
