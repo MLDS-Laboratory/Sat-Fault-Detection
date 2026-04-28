@@ -64,6 +64,11 @@ class ModelTrainer:
 
         for epoch in range(num_epochs):
             print(f"Epoch {epoch+1}/{num_epochs}")
+            # Fix — Add a warm-up phase. First 2 epochs, focal only.
+            use_f05 = epoch >= 2
+            if epoch == 2:
+                print("Warm-up complete. Switching to full CompoundLoss (focal + soft-F0.5).")
+
             for phase in ['train', 'val']:
                 self.model.train(phase == 'train')
 
@@ -84,7 +89,12 @@ class ModelTrainer:
                                 outputs = self.model(inputs)
                                 proba = torch.softmax(outputs, dim=1)[:, 1]
                                 _, preds = torch.max(outputs, 1)
-                                loss = self.criterion(outputs, labels)
+                                
+                                # Use use_f05 flag if criterion supports it
+                                if hasattr(self.criterion, 'forward') and 'use_f05' in self.criterion.forward.__code__.co_varnames:
+                                    loss = self.criterion(outputs, labels, use_f05=use_f05)
+                                else:
+                                    loss = self.criterion(outputs, labels)
                                 
                                 if phase == 'train':
                                     loss.backward()
@@ -94,7 +104,10 @@ class ModelTrainer:
                                     outputs = self.model(inputs)
                                     proba = torch.softmax(outputs, dim=1)[:, 1]
                                     _, preds = torch.max(outputs, 1)
-                                    loss = self.criterion(outputs, labels)
+                                    if hasattr(self.criterion, 'forward') and 'use_f05' in self.criterion.forward.__code__.co_varnames:
+                                        loss = self.criterion(outputs, labels, use_f05=use_f05)
+                                    else:
+                                        loss = self.criterion(outputs, labels)
                                 
                                 if phase == 'train':
                                     scaler.scale(loss).backward()
@@ -119,6 +132,15 @@ class ModelTrainer:
                 epoch_loss = running_loss / len(self.dataloaders[phase].dataset)
                 epoch_acc  = accuracy_score(all_labels, all_preds)
                 epoch_f1   = f1_score(all_labels, all_preds, average='macro')
+
+                # Fix — Add a sanity check assertion for train_recall
+                if phase == 'train':
+                    train_metrics = self.compute_sample_f05(np.array(all_labels), np.array(all_proba), threshold=0.5)
+                    train_recall = train_metrics['recall']
+                    if epoch < 2 and train_recall == 0.0:
+                         print("Warning: Model has zero recall on training anomalies. Focal loss weighting should correct this...")
+                    if epoch == 1 and train_recall == 0.0:
+                         print("CRITICAL: Model may be collapsed — check class weights and learning rate. train_recall is still 0.0")
 
                 self.history[f'{phase}_loss'].append(epoch_loss)
                 self.history[f'{phase}_acc'].append(epoch_acc)

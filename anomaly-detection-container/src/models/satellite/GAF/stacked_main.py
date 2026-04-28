@@ -17,10 +17,9 @@ def parse_args():
     p.add_argument("--data_dir", type=str, default=os.path.abspath(os.path.join(__file__, "../../../../data/ESA-Anomaly/ESA-Mission1")))
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--batch_size", type=int, default=32)
-    p.add_argument("--lr", type=float, default=5e-3)
+    p.add_argument("--lr", type=float, default=5e-5)
     p.add_argument("--model", choices=["pretrained","scratch"], default="pretrained")
     p.add_argument("--mixed_precision", action="store_true")
-    # Added argument for local transfer weights testing
     p.add_argument("--local_weights", type=str, default=None, help="Local path to weights for transfer learning")
     return p.parse_args()
 
@@ -38,13 +37,16 @@ def run_main(model_name, model, hyperparams, mission_dir):
     actual_test_max = base_test_max // in_channels
     print(f"Adjusting max segments for {in_channels} channels: Train limit={actual_train_max}, Test limit={actual_test_max}")
 
+    # Step 1 — Disable oversampling. (By setting min_anomaly_pct=0.0 and knowing default behavior)
+    # Actually, stacked_stratified_sample always does some sampling. 
+    # To disable oversampling/forcing anomaly share, we can set min_anomaly_pct=0.0
     train_segs, test_segs = stacked_stratified_sample(
         train_segs, test_segs, 
         max_train_samples=actual_train_max, 
-        max_test_samples=actual_test_max
+        max_test_samples=actual_test_max,
+        min_anomaly_pct=0.0
     )
 
-    # Transforms (No ToTensor or Normalize here, as StackedGAFDataset handles tensor creation natively)
     full_train = StackedGAFDataset(train_segs, cache_dir="/tmp/stacked_gaf_cache")
     test_ds    = StackedGAFDataset(test_segs,  cache_dir="/tmp/stacked_gaf_cache")
 
@@ -62,11 +64,9 @@ def run_main(model_name, model, hyperparams, mission_dir):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     criterion = hyperparams['loss_fn']
     
-    # Only pass parameters that require gradients to the optimizer
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = optim.Adam(trainable_params, lr=hyperparams['lr'])
 
-    # W&B init
     run = maybe_init_wandb(project="gaf-anomaly-clf", config={
         "arch": model_name, "epochs": hyperparams['epochs'], "batch_size": bs, "lr": hyperparams['lr'], "type": "stacked"
     })
@@ -76,7 +76,7 @@ def run_main(model_name, model, hyperparams, mission_dir):
                            wandb_run=run)
 
     model_trained, history = trainer.train(num_epochs=hyperparams['epochs'])
-    test_acc, test_f1, test_cm = trainer.evaluate(phase='test')
+    test_acc, test_f05, test_cm = trainer.evaluate(phase='test')
 
     best_path = os.path.join(model_dir(), f"{model.__class__.__name__}_best.pth")
     if os.path.exists(best_path):
@@ -98,7 +98,7 @@ def run_main(model_name, model, hyperparams, mission_dir):
         'val_acc': history['val_acc'],
         'val_f1': history['val_f1'],
         'test_acc': test_acc,
-        'test_f1': test_f1,
+        'test_f05': test_f05,
         'test_confusion_matrix': test_cm.tolist()
     }
 
@@ -106,19 +106,15 @@ if __name__ == "__main__":
     args = parse_args()
     mission_dir = data_dir(args.data_dir)
 
-    # 1. Peek at the data to dynamically get the number of channels
     import pandas as pd
     channels_csv_path = os.path.join(mission_dir, "channels.csv")
     if not os.path.exists(channels_csv_path):
         raise FileNotFoundError(f"Could not find {channels_csv_path} to determine channels.")
     
     in_channels = len(pd.read_csv(channels_csv_path))
-    print(f"Detected {in_channels} channels for Stacked GAFs.")
 
-    # 2. Check for Transfer Learning Weights (SageMaker mapped or Local)
     weights_dir = os.environ.get("SM_CHANNEL_WEIGHTS")
     transfer_path = None
-    
     if weights_dir and os.path.exists(weights_dir):
         pth_files = [f for f in os.listdir(weights_dir) if f.endswith('.pth')]
         if pth_files: 
@@ -126,22 +122,18 @@ if __name__ == "__main__":
     elif args.local_weights and os.path.exists(args.local_weights):
         transfer_path = args.local_weights
 
-    # 3. Model Initialization
     if transfer_path:
-        print(f"Initializing Transfer Learning from {transfer_path}")
         model = load_transfer_model(args.model, transfer_path, in_channels, num_classes=2)
         model_name = f"{args.model}_transfer"
     elif args.model == "scratch":
-        print("Initializing Scratch CNN")
         model = StackedScratchCNN(in_channels=in_channels, num_classes=2)
         model_name = "scratch_stacked"
     else:
-        print("Initializing Pretrained ResNet")
         model = StackedResNet(in_channels=in_channels, num_classes=2, freeze_early=True)
         model_name = "pretrained_stacked"
 
     hp = dict(
         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, mixed_precision=args.mixed_precision,
-        loss_fn=CompoundLoss(focal_weight=0.7, f05_weight=0.3, gamma_neg=2.0, alpha=0.25), loss_name="CompoundLoss"
+        loss_fn=CompoundLoss(focal_weight=0.5, f05_weight=0.5, gamma_neg=4.0, alpha=0.95), loss_name="CompoundLoss"
     )
     res = run_main(model_name, model, hp, mission_dir=mission_dir)

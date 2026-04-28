@@ -4,10 +4,6 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 import torch.optim as optim
 
-# import sys
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")))
-
-# from pipelines.ops_sat_dataloader import OpsSatDataLoader
 from pipelines.esa_dataloader import ESAMissionDataLoader
 from models.satellite.GAF.gaf_data_loader import GAFDataset, stratified_sample
 from models.satellite.GAF.CNNs.pretrained_resnet import get_pretrained_resnet
@@ -22,7 +18,7 @@ def parse_args():
     p.add_argument("--data_dir", type=str, default=os.path.abspath(os.path.join(__file__, "../../../../data/ESA-Anomaly/ESA-Mission1")))
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--batch_size", type=int, default=32)
-    p.add_argument("--lr", type=float, default=5e-3)
+    p.add_argument("--lr", type=float, default=5e-5)
     p.add_argument("--model", choices=["pretrained","scratch"], default="pretrained")
     p.add_argument("--mixed_precision", action="store_true")
     return p.parse_args()
@@ -87,10 +83,8 @@ def run_main(model_name, model, hyperparams, mission_dir):
                            wandb_run=run)
 
     model_trained, history = trainer.train(num_epochs=hyperparams['epochs'])
-    test_acc, test_f1, test_cm = trainer.evaluate(phase='test')
+    test_acc, test_f05, test_cm = trainer.evaluate(phase='test')
 
-    # Log the best model saved by trainer as a W&B artifact too
-    # (filename uses class name *_best.pth)
     from utils.env_utils import model_dir
     best_path = os.path.join(model_dir(), f"{model.__class__.__name__}_best.pth")
     if os.path.exists(best_path):
@@ -112,13 +106,13 @@ def run_main(model_name, model, hyperparams, mission_dir):
         'val_acc': history['val_acc'],
         'val_f1': history['val_f1'],
         'test_acc': test_acc,
-        'test_f1': test_f1,
+        'test_f05': test_f05,
         'test_confusion_matrix': test_cm.tolist()
     }
 
 if __name__ == "__main__":
     args = parse_args()
-    mission_dir = data_dir(args.data_dir)  # respects SageMaker channel if present
+    mission_dir = data_dir(args.data_dir)
 
     if args.model == "scratch":
         model = CNNFromScratch(num_classes=2, input_size=224); model_name="scratch"
@@ -127,7 +121,7 @@ if __name__ == "__main__":
 
     hp = dict(
         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, mixed_precision=args.mixed_precision,
-        loss_fn=CompoundLoss(focal_weight=0.7, f05_weight=0.3, gamma_neg=2.0, alpha=0.75), loss_name="CompoundLoss"
+        loss_fn=CompoundLoss(focal_weight=0.5, f05_weight=0.5, gamma_neg=4.0, alpha=0.95), loss_name="CompoundLoss"
     )
     res = run_main(model_name, model, hp, mission_dir=mission_dir)
     print(res)

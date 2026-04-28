@@ -16,7 +16,7 @@ def parse():
     p.add_argument("--data_dir", default="data/ESA-Anomaly/ESA-Mission1")
     p.add_argument("--epochs", type=int, default=10)                # time bottleneck
     p.add_argument("--batch_size", type=int, default=64)            # memory bottleneck
-    p.add_argument("--lr", type=float, default=5e-3)
+    p.add_argument("--lr", type=float, default=1e-4)
     p.add_argument("--model", choices=["pretrained", "scratch"], default="pretrained")
     p.add_argument("--instance_type", default="ml.g5.12xlarge")
     p.add_argument("--spot", action="store_true")
