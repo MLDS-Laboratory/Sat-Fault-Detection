@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, fbeta_score, precision_score, recall_score
 from tqdm import tqdm
-import time, os
+import time, os, traceback
 import numpy as np
 from utils.env_utils import model_dir, ensure_dir
 
@@ -17,6 +17,9 @@ class ModelTrainer:
         self.wandb = wandb_run  # can be a no-op
         self.scheduler = scheduler
         self.best_threshold = 0.5
+        
+        self.nominal_collapse_count = 0
+        self.original_lr = self.optimizer.param_groups[0]['lr']
 
         self.history = {
             'train_loss': [], 'train_acc': [], 'train_f1': [],
@@ -64,10 +67,11 @@ class ModelTrainer:
         global_step = 0
 
         for epoch in range(num_epochs):
+            epoch_start_time = time.time()
             print(f"Epoch {epoch+1}/{num_epochs}")
-            # Fix — Add a warm-up phase. First 2 epochs, focal only.
-            use_f05 = epoch >= 2
-            if epoch == 2:
+            # Fix 4 — Extend warm-up to 3 epochs.
+            use_f05 = epoch >= 3
+            if epoch == 3:
                 print("Warm-up complete. Switching to full CompoundLoss (focal + soft-F0.5).")
 
             for phase in ['train', 'val']:
@@ -80,89 +84,115 @@ class ModelTrainer:
                 
                 epoch_total_norm = 0.0
                 num_grad_steps = 0
+                batches_processed = 0
 
                 with tqdm(total=total_batches, desc=f'{phase.capitalize()}', ncols=100) as pbar:
                     t0 = time.time()
-                    for i, (inputs, labels) in enumerate(self.dataloaders[phase]):
-                        inputs, labels = inputs.to(self.device), labels.to(self.device)
-                        
-                        if phase == 'train' and i % accumulation_steps == 0:
-                            self.optimizer.zero_grad(set_to_none=True)
+                    try:
+                        for i, (inputs, labels) in enumerate(self.dataloaders[phase]):
+                            inputs, labels = inputs.to(self.device), labels.to(self.device)
+                            
+                            if phase == 'train' and i % accumulation_steps == 0:
+                                self.optimizer.zero_grad(set_to_none=True)
 
-                        with torch.set_grad_enabled(phase == 'train'):
+                            with torch.set_grad_enabled(phase == 'train'):
 
-                            if scaler is None:
-                                outputs = self.model(inputs)
-                                proba = torch.softmax(outputs, dim=1)[:, 1]
-                                _, preds = torch.max(outputs, 1)
-                                
-                                # Use use_f05 flag if criterion supports it
-                                if hasattr(self.criterion, 'forward') and 'use_f05' in self.criterion.forward.__code__.co_varnames:
-                                    loss = self.criterion(outputs, labels, use_f05=use_f05)
-                                else:
-                                    loss = self.criterion(outputs, labels)
-                                
-                                if phase == 'train':
-                                    # Normalize loss for accumulation
-                                    (loss / accumulation_steps).backward()
-                            else:
-                                with torch.cuda.amp.autocast("cuda"):
+                                if scaler is None:
                                     outputs = self.model(inputs)
                                     proba = torch.softmax(outputs, dim=1)[:, 1]
                                     _, preds = torch.max(outputs, 1)
+                                    
+                                    # Use use_f05 flag if criterion supports it
                                     if hasattr(self.criterion, 'forward') and 'use_f05' in self.criterion.forward.__code__.co_varnames:
                                         loss = self.criterion(outputs, labels, use_f05=use_f05)
                                     else:
                                         loss = self.criterion(outputs, labels)
-                                
-                                if phase == 'train':
-                                    scaler.scale(loss / accumulation_steps).backward()
-                        
-                        if phase == 'train':
-                            if (i + 1) % accumulation_steps == 0 or (i + 1) == total_batches:
-                                # Add a gradient norm log
-                                if scaler is None:
-                                    total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                                    self.optimizer.step()
+                                    
+                                    if phase == 'train':
+                                        # Fix 3 — Assertion before backward
+                                        assert loss.requires_grad, f"Loss at epoch {epoch} batch {i} has no gradient."
+                                        # Normalize loss for accumulation
+                                        (loss / accumulation_steps).backward()
                                 else:
-                                    scaler.unscale_(self.optimizer)
-                                    total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                                    scaler.step(self.optimizer)
-                                    scaler.update()
-                                
-                                epoch_total_norm += total_norm.item()
-                                num_grad_steps += 1
-                                
-                                # Reset buffer after gradient step
-                                if hasattr(self.criterion, 'reset_buffer'):
-                                    self.criterion.reset_buffer()
-                                
-                                global_step += 1
-                                if self.wandb:
-                                    self.wandb.log({"train/loss_step": float(loss.item()), "train/grad_norm": total_norm.item()})
+                                    with torch.cuda.amp.autocast("cuda"):
+                                        outputs = self.model(inputs)
+                                        proba = torch.softmax(outputs, dim=1)[:, 1]
+                                        _, preds = torch.max(outputs, 1)
+                                        if hasattr(self.criterion, 'forward') and 'use_f05' in self.criterion.forward.__code__.co_varnames:
+                                            loss = self.criterion(outputs, labels, use_f05=use_f05)
+                                        else:
+                                            loss = self.criterion(outputs, labels)
+                                    
+                                    if phase == 'train':
+                                        assert loss.requires_grad, f"Loss (AMP) at epoch {epoch} batch {i} has no gradient."
+                                        scaler.scale(loss / accumulation_steps).backward()
+                            
+                            if phase == 'train':
+                                if (i + 1) % accumulation_steps == 0 or (i + 1) == total_batches:
+                                    if scaler is None:
+                                        total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                                        self.optimizer.step()
+                                    else:
+                                        scaler.unscale_(self.optimizer)
+                                        total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                                        scaler.step(self.optimizer)
+                                        scaler.update()
+                                    
+                                    epoch_total_norm += total_norm.item()
+                                    num_grad_steps += 1
+                                    
+                                    global_step += 1
+                                    if self.wandb:
+                                        log_msg = {"train/loss_step": float(loss.item()), "train/grad_norm": total_norm.item()}
+                                        if not use_f05:
+                                            log_msg["train/warmup_grad_norm"] = total_norm.item()
+                                        self.wandb.log(log_msg)
 
-                        # Update statistics
-                        running_loss += loss.item() * inputs.size(0)
-                        all_preds.extend(preds.detach().cpu().numpy())
-                        all_labels.extend(labels.detach().cpu().numpy())
-                        all_proba.extend(proba.detach().cpu().numpy())
+                            # Update statistics
+                            running_loss += loss.item() * inputs.size(0)
+                            all_preds.extend(preds.detach().cpu().numpy())
+                            all_labels.extend(labels.detach().cpu().numpy())
+                            all_proba.extend(proba.detach().cpu().numpy())
+                            batches_processed += 1
 
-                        pbar.set_postfix({'loss': f'{loss.item():.4f}',
-                                          'ETA': f'{(time.time()-t0)/(i+1)*(total_batches-i-1):.1f}s'})
-                        pbar.update(1)
+                            pbar.set_postfix({'loss': f'{loss.item():.4f}',
+                                              'ETA': f'{(time.time()-t0)/(i+1)*(total_batches-i-1):.1f}s'})
+                            pbar.update(1)
+                    except Exception as e:
+                        print(f"CRITICAL: Error in batch loop: {e}")
+                        traceback.print_exc()
+                        if self.wandb:
+                            self.wandb.log({"error/traceback": traceback.format_exc()})
+                        raise e
 
                 epoch_loss = running_loss / len(self.dataloaders[phase].dataset)
                 epoch_acc  = accuracy_score(all_labels, all_preds)
                 epoch_f1   = f1_score(all_labels, all_preds, average='macro')
 
-                # Fix — Add a sanity check assertion for train_recall
+                # Fix 5 — Self-correcting LR shock for nominal collapse
                 if phase == 'train':
                     train_metrics = self.compute_sample_f05(np.array(all_labels), np.array(all_proba), threshold=0.5)
                     train_recall = train_metrics['recall']
-                    if epoch < 2 and train_recall == 0.0:
-                         print("Warning: Model has zero recall on training anomalies. Focal loss weighting should correct this...")
-                    if epoch == 1 and train_recall == 0.0:
-                         print("CRITICAL: Model may be collapsed — check class weights and learning rate. train_recall is still 0.0")
+                    train_pred_rate = (np.array(all_preds) == 1).mean()
+                    
+                    if not use_f05:
+                        if train_recall == 0.0:
+                             print("Warning: Model has zero recall on training anomalies.")
+                        
+                        if train_pred_rate < 0.001:
+                            self.nominal_collapse_count += 1
+                            if self.nominal_collapse_count >= 2:
+                                print(f"CRITICAL: Nominal collapse detected (rate={train_pred_rate:.4f}). Shocking LR by 5.0x")
+                                for param_group in self.optimizer.param_groups:
+                                    param_group['lr'] = self.original_lr * 5.0
+                                self.nominal_collapse_count = 0 # reset after shock
+                        else:
+                            # Reset if it escapes collapse
+                            self.nominal_collapse_count = 0
+                            # Also reset LR to original if it was shocked (this check is simple)
+                            if abs(self.optimizer.param_groups[0]['lr'] - self.original_lr) > 1e-9:
+                                for param_group in self.optimizer.param_groups:
+                                    param_group['lr'] = self.original_lr
 
                 self.history[f'{phase}_loss'].append(epoch_loss)
                 self.history[f'{phase}_acc'].append(epoch_acc)
@@ -174,7 +204,8 @@ class ModelTrainer:
                     f"{phase}/loss": epoch_loss,
                     f"{phase}/acc": epoch_acc,
                     f"{phase}/f1": epoch_f1,
-                    "epoch": epoch
+                    "epoch": epoch,
+                    f"{phase}/batches_processed": batches_processed
                 }
                 
                 if phase == 'train' and num_grad_steps > 0:
@@ -188,7 +219,6 @@ class ModelTrainer:
                     self.history['val_recall'].append(metrics['recall'])
                     self.history['val_tnr'].append(metrics['tnr'])
                     
-                    # Fix 6 — Log the anomaly prediction rate
                     val_preds = (np.array(all_proba) >= 0.5).astype(int)
                     anomaly_pred_rate = val_preds.mean()
                     
@@ -209,8 +239,16 @@ class ModelTrainer:
                 if self.wandb:
                     self.wandb.log(log_dict)
 
-            # end phases
-            # Fix 3 — Call scheduler.step() at the end of each epoch
+            # Fix 2 — Log epoch start/end time
+            epoch_end_time = time.time()
+            if self.wandb:
+                self.wandb.log({
+                    "epoch/duration": epoch_end_time - epoch_start_time,
+                    "epoch/start_time": epoch_start_time,
+                    "epoch/end_time": epoch_end_time,
+                    "epoch": epoch
+                })
+
             if self.scheduler:
                 self.scheduler.step()
                 if self.wandb:
@@ -310,4 +348,3 @@ class ModelTrainer:
                     y_true=y_true.tolist(), preds=all_preds.tolist(), class_names=["normal","anomaly"])
             })
         return acc, metrics['f05'], cm
-
