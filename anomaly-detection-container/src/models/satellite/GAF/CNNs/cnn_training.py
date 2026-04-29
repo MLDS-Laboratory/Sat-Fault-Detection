@@ -188,12 +188,17 @@ class ModelTrainer:
                     self.history['val_recall'].append(metrics['recall'])
                     self.history['val_tnr'].append(metrics['tnr'])
                     
-                    print(f"Val F0.5: {epoch_f05:.4f} (Prec: {metrics['precision']:.4f}, Rec: {metrics['recall']:.4f}, TNR: {metrics['tnr']:.4f})")
+                    # Fix 6 — Log the anomaly prediction rate
+                    val_preds = (np.array(all_proba) >= 0.5).astype(int)
+                    anomaly_pred_rate = val_preds.mean()
+                    
+                    print(f"Val F0.5: {epoch_f05:.4f} (Prec: {metrics['precision']:.4f}, Rec: {metrics['recall']:.4f}, TNR: {metrics['tnr']:.4f}, PredRate: {anomaly_pred_rate:.4f})")
                     log_dict.update({
                         f"{phase}/f05": epoch_f05,
                         f"{phase}/precision": metrics['precision'],
                         f"{phase}/recall": metrics['recall'],
-                        f"{phase}/tnr": metrics['tnr']
+                        f"{phase}/tnr": metrics['tnr'],
+                        f"{phase}/anomaly_pred_rate": anomaly_pred_rate
                     })
 
                     if epoch_f05 > best_f05:
