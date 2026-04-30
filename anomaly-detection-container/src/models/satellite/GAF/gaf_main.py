@@ -51,11 +51,13 @@ def run_main(model_name, model, hyperparams, mission_dir):
     train_ds = Subset(full_train, list(range(split)))
     val_ds   = Subset(full_train, list(range(split, n)))
 
+    from models.satellite.GAF.gaf_data_loader import GAFDataset, stratified_sample, mil_collate
+    
     bs = hyperparams['batch_size']
     dataloaders = {
-        'train': DataLoader(train_ds, batch_size=bs, shuffle=True,  num_workers=4, pin_memory=False, prefetch_factor=1),
-        'val':   DataLoader(val_ds,   batch_size=bs, shuffle=False, num_workers=4, pin_memory=False, prefetch_factor=1),
-        'test':  DataLoader(test_ds,  batch_size=bs, shuffle=False, num_workers=4, pin_memory=False, prefetch_factor=1),
+        'train': DataLoader(train_ds, batch_size=bs, shuffle=True,  num_workers=4, pin_memory=False, prefetch_factor=1, collate_fn=mil_collate),
+        'val':   DataLoader(val_ds,   batch_size=bs, shuffle=False, num_workers=4, pin_memory=False, prefetch_factor=1, collate_fn=mil_collate),
+        'test':  DataLoader(test_ds,  batch_size=bs, shuffle=False, num_workers=4, pin_memory=False, prefetch_factor=1, collate_fn=mil_collate),
     }
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

@@ -141,19 +141,23 @@ def stratified_sample(train_segs, test_segs, max_train_samples, max_test_samples
     return train_segs, test_segs
 
 
+import torch
+
+def mil_collate(batch):
+    """
+    Custom collate function for MIL. 
+    Returns bags as a list (since they have variable sizes) and labels as a tensor.
+    """
+    bags = [item[0] for item in batch]
+    labels = torch.tensor([item[1] for item in batch])
+    return bags, labels
+
 class GAFDataset(Dataset):
     """
-    Torch Dataset that converts each OPS-SAT segment into a GAF image.
-    By using torchvision transforms, setup to feed into CNN
+    Torch Dataset that converts each ESA segment bag into a stack of GAF images.
+    Implements MIL by returning [N, C, H, W] where N is bag size.
     """
     def __init__(self, segments, transform=None, image_size=224, cache_dir=None):
-        """
-        Parameters:
-        - segments: list of dicts with keys 'segment', 'channel', 'ts', 'label', 'sampling', 'train'
-        - transform: torchvision transforms to apply to the GAF image
-        - image_size: size of the output GAF image (default 224)
-        - cache_dir: directory to cache GAF images. If None, caching is disabled.
-        """
         self.segments = segments
         self.transform = transform
         self.image_size = image_size
@@ -166,31 +170,60 @@ class GAFDataset(Dataset):
 
     def __getitem__(self, idx):
         seg_dict = self.segments[idx]
-        ts = seg_dict['ts']
+        bag_ts = seg_dict['ts']  # This is now a list of arrays
         label = seg_dict['label']
 
-        # Try to load from cache first
-        if self.cache_dir:
-            cache_path = os.path.join(self.cache_dir, f"gaf_{seg_dict['segment']}_{seg_dict['channel']}.pkl")
-            if os.path.exists(cache_path):
-                with open(cache_path, 'rb') as f:
-                    img = pickle.load(f)
+        bag_imgs = []
+        for i, ts in enumerate(bag_ts):
+            # Unique cache key per window in the bag
+            ch_key = seg_dict.get('channel', 'stacked')
+            cache_path = None
+            if self.cache_dir:
+                cache_path = os.path.join(self.cache_dir, f"gaf_{seg_dict['segment']}_{ch_key}_bag{i}.pkl")
+                if os.path.exists(cache_path):
+                    with open(cache_path, 'rb') as f:
+                        img = pickle.load(f)
+                else:
+                    img = self._compute_gaf_image(ts)
+                    with open(cache_path, 'wb') as f:
+                        pickle.dump(img, f)
             else:
                 img = self._compute_gaf_image(ts)
-                with open(cache_path, 'wb') as f:
-                    pickle.dump(img, f)
-        else:
-            img = self._compute_gaf_image(ts)
+
+            if self.transform:
+                img = self.transform(img)
+            bag_imgs.append(img)
             
-        if self.transform:
-            img = self.transform(img)
-            
-        return img, label
+        return torch.stack(bag_imgs), label
         
     def _compute_gaf_image(self, ts):
-        # GAF transformation code
-        gaf_img = compute_gaf(ts)
-        gaf_img = (gaf_img - gaf_img.min()) / (gaf_img.max() - gaf_img.min() + 1e-8)
-        gaf_img = np.uint8(255 * gaf_img)
-        img = Image.fromarray(gaf_img).resize((self.image_size, self.image_size))
-        return img.convert("L")
+        # Handle 1D (Single Channel) or 2D (Stacked)
+        if ts.ndim == 1:
+            gaf_img = compute_gaf(ts)
+            gaf_img = (gaf_img - gaf_img.min()) / (gaf_img.max() - gaf_img.min() + 1e-8)
+            gaf_img = np.uint8(255 * gaf_img)
+            img = Image.fromarray(gaf_img).resize((self.image_size, self.image_size)).convert("L")
+        else:
+            # Stacked Case: ts is [SeqLen, NumChannels]
+            # We compute GAF for each channel and stack them as RGB or similar
+            # But the models expect [Channels, H, W]. 
+            # For simplicity, we process each channel's GAF
+            num_channels = ts.shape[1]
+            gafs = []
+            for c in range(num_channels):
+                g = compute_gaf(ts[:, c])
+                g = (g - g.min()) / (g.max() - g.min() + 1e-8)
+                gafs.append(np.uint8(255 * g))
+            
+            # Combine into a multi-channel image
+            # PIL doesn't handle N-channels well, so we use numpy then resize
+            combined = np.stack(gafs, axis=0) # [C, H, W]
+            # Resize each channel
+            resized_gafs = []
+            for c in range(num_channels):
+                img_c = Image.fromarray(combined[c]).resize((self.image_size, self.image_size))
+                resized_gafs.append(np.array(img_c))
+            img = np.stack(resized_gafs, axis=0) # [C, H, W]
+            return img # Return as numpy array, transform will handle it
+
+        return img

@@ -89,8 +89,11 @@ class ModelTrainer:
                 with tqdm(total=total_batches, desc=f'{phase.capitalize()}', ncols=100) as pbar:
                     t0 = time.time()
                     try:
-                        for i, (inputs, labels) in enumerate(self.dataloaders[phase]):
-                            inputs, labels = inputs.to(self.device), labels.to(self.device)
+                        for i, (bags, labels) in enumerate(self.dataloaders[phase]):
+                            # bags is a list of Tensors [N_i, C, H, W], labels is Tensor [B]
+                            labels = labels.to(self.device)
+                            bag_sizes = [b.shape[0] for b in bags]
+                            inputs = torch.cat(bags).to(self.device) # [Total_Instances, C, H, W]
                             
                             if phase == 'train' and i % accumulation_steps == 0:
                                 self.optimizer.zero_grad(set_to_none=True)
@@ -98,7 +101,17 @@ class ModelTrainer:
                             with torch.set_grad_enabled(phase == 'train'):
 
                                 if scaler is None:
-                                    outputs = self.model(inputs)
+                                    all_logits = self.model(inputs)
+                                    bag_logits = torch.split(all_logits, bag_sizes)
+                                    
+                                    # MIL Pooling: Select logit with max anomaly probability
+                                    pooled_logits = []
+                                    for bl in bag_logits:
+                                        probs = torch.softmax(bl, dim=1)[:, 1]
+                                        max_idx = torch.argmax(probs)
+                                        pooled_logits.append(bl[max_idx])
+                                    outputs = torch.stack(pooled_logits)
+                                    
                                     proba = torch.softmax(outputs, dim=1)[:, 1]
                                     _, preds = torch.max(outputs, 1)
                                     
@@ -109,13 +122,19 @@ class ModelTrainer:
                                         loss = self.criterion(outputs, labels)
                                     
                                     if phase == 'train':
-                                        # Fix 3 — Assertion before backward
-                                        assert loss.requires_grad, f"Loss at epoch {epoch} batch {i} has no gradient."
                                         # Normalize loss for accumulation
                                         (loss / accumulation_steps).backward()
                                 else:
                                     with torch.cuda.amp.autocast("cuda"):
-                                        outputs = self.model(inputs)
+                                        all_logits = self.model(inputs)
+                                        bag_logits = torch.split(all_logits, bag_sizes)
+                                        pooled_logits = []
+                                        for bl in bag_logits:
+                                            probs = torch.softmax(bl, dim=1)[:, 1]
+                                            max_idx = torch.argmax(probs)
+                                            pooled_logits.append(bl[max_idx])
+                                        outputs = torch.stack(pooled_logits)
+                                        
                                         proba = torch.softmax(outputs, dim=1)[:, 1]
                                         _, preds = torch.max(outputs, 1)
                                         if hasattr(self.criterion, 'forward') and 'use_f05' in self.criterion.forward.__code__.co_varnames:
@@ -124,7 +143,6 @@ class ModelTrainer:
                                             loss = self.criterion(outputs, labels)
                                     
                                     if phase == 'train':
-                                        assert loss.requires_grad, f"Loss (AMP) at epoch {epoch} batch {i} has no gradient."
                                         scaler.scale(loss / accumulation_steps).backward()
                             
                             if phase == 'train':
@@ -144,12 +162,10 @@ class ModelTrainer:
                                     global_step += 1
                                     if self.wandb:
                                         log_msg = {"train/loss_step": float(loss.item()), "train/grad_norm": total_norm.item()}
-                                        if not use_f05:
-                                            log_msg["train/warmup_grad_norm"] = total_norm.item()
                                         self.wandb.log(log_msg)
 
-                            # Update statistics
-                            running_loss += loss.item() * inputs.size(0)
+                            # Update statistics - use labels.size(0) which is batch size (number of bags)
+                            running_loss += loss.item() * labels.size(0)
                             all_preds.extend(preds.detach().cpu().numpy())
                             all_labels.extend(labels.detach().cpu().numpy())
                             all_proba.extend(proba.detach().cpu().numpy())
@@ -270,12 +286,20 @@ class ModelTrainer:
         self.model.eval()
         all_labels, all_proba = [], []
         with torch.no_grad():
-            for inputs, labels in val_loader:
-                inputs = inputs.to(self.device)
-                outputs = self.model(inputs)
-                proba = torch.softmax(outputs, dim=1)[:, 1]
+            for bags, labels in val_loader:
+                bag_sizes = [b.shape[0] for b in bags]
+                flat_inputs = torch.cat(bags).to(self.device)
+                all_logits = self.model(flat_inputs)
+                bag_logits = torch.split(all_logits, bag_sizes)
+                
+                pooled_probs = []
+                for bl in bag_logits:
+                    probs = torch.softmax(bl, dim=1)[:, 1]
+                    # MIL: The bag's probability is the max of its instances
+                    pooled_probs.append(torch.max(probs))
+                
+                all_proba.extend(torch.stack(pooled_probs).cpu().numpy())
                 all_labels.extend(labels.numpy())
-                all_proba.extend(proba.cpu().numpy())
         
         y_true = np.array(all_labels)
         y_proba = np.array(all_proba)
@@ -308,14 +332,20 @@ class ModelTrainer:
         """
         self.model.eval()
         all_labels, all_proba = [], []
-        for inputs, labels in self.dataloaders[phase]:
-            inputs = inputs.to(self.device)
+        for bags, labels in self.dataloaders[phase]:
+            bag_sizes = [b.shape[0] for b in bags]
+            flat_inputs = torch.cat(bags).to(self.device)
             with torch.no_grad():
-                outputs = self.model(inputs)
-                proba = torch.softmax(outputs, dim=1)[:, 1]
-
-            all_labels.extend(labels.numpy())
-            all_proba.extend(proba.cpu().numpy())
+                all_logits = self.model(flat_inputs)
+                bag_logits = torch.split(all_logits, bag_sizes)
+                
+                pooled_probs = []
+                for bl in bag_logits:
+                    probs = torch.softmax(bl, dim=1)[:, 1]
+                    pooled_probs.append(torch.max(probs))
+                
+                all_proba.extend(torch.stack(pooled_probs).cpu().numpy())
+                all_labels.extend(labels.numpy())
 
         y_true = np.array(all_labels)
         y_proba = np.array(all_proba)

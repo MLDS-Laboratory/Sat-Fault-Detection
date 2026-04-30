@@ -62,11 +62,13 @@ def main():
         transforms.Normalize([0.5], [0.5])  # 1D Grayscale normalization
     ])
 
+    from models.satellite.GAF.gaf_data_loader import GAFDataset, mil_collate
+
     test_ds = GAFDataset(test_segs, transform=eval_tfms, cache_dir="/tmp/gaf_cache_eval")
     
     # We map this to the 'test' key so ModelTrainer.evaluate(phase='test') works perfectly
     dataloaders = {
-        'test': DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=False)
+        'test': DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=False, collate_fn=mil_collate)
     }
 
     # 4. Initialize W&B and Trainer

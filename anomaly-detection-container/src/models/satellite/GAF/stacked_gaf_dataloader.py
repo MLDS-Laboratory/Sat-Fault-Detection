@@ -68,41 +68,46 @@ class StackedGAFDataset(Dataset):
 
     def __getitem__(self, idx):
         seg_dict = self.segments[idx]
-        ts_2d = seg_dict['ts'] # Shape: (Seq_len, Channels)
+        bag_ts = seg_dict['ts'] # List of (Seq_len, Channels)
         label = seg_dict['label']
         seg_id = seg_dict['segment']
 
-        if self.cache_dir:
-            cache_path = os.path.join(self.cache_dir, f"stacked_gaf_{seg_id}.pkl")
-            if os.path.exists(cache_path):
-                with open(cache_path, 'rb') as f:
-                    tensor_img = pickle.load(f)
-                return tensor_img, label
+        bag_tensors = []
+        for bag_idx, ts_2d in enumerate(bag_ts):
+            cache_path = None
+            if self.cache_dir:
+                cache_path = os.path.join(self.cache_dir, f"stacked_gaf_{seg_id}_bag{bag_idx}.pkl")
+                if os.path.exists(cache_path):
+                    with open(cache_path, 'rb') as f:
+                        tensor_img = pickle.load(f)
+                    bag_tensors.append(tensor_img)
+                    continue
 
-        # OPTIMIZATION: Downsample the 1D time series FIRST.
-        # 1. Convert to tensor and reshape to (Batch=1, Channels, Seq_len)
-        ts_tensor = torch.from_numpy(ts_2d.copy()).float().t().unsqueeze(0)
-        
-        # 2. Interpolate the time series down to exactly `image_size` (e.g., 224 points)
-        ts_downsampled = F.interpolate(ts_tensor, size=self.image_size, mode='linear', align_corners=False)
-        ts_downsampled = ts_downsampled.squeeze(0).numpy() # Shape: (Channels, 224)
-
-        # 3. Compute GAFs. Because input is 224, output is natively 224x224!
-        num_channels = ts_downsampled.shape[0]
-        gafs = []
-        for c in range(num_channels):
-            gaf = compute_gaf(ts_downsampled[c, :])
-            gaf = (gaf - gaf.min()) / (gaf.max() - gaf.min() + 1e-8)
-            gafs.append(gaf)
+            # 1. Convert to tensor and reshape to (Batch=1, Channels, Seq_len)
+            ts_tensor = torch.from_numpy(ts_2d.copy()).float().t().unsqueeze(0)
             
-        stacked = np.stack(gafs, axis=0) # Shape: (Channels, 224, 224)
-        tensor_img = torch.from_numpy(stacked).float()
-        
-        # Normalize: mean=0.5, std=0.5 across all channels
-        tensor_img = (tensor_img - 0.5) / 0.5
+            # 2. Interpolate the time series down to exactly `image_size` (e.g., 224 points)
+            ts_downsampled = F.interpolate(ts_tensor, size=self.image_size, mode='linear', align_corners=False)
+            ts_downsampled = ts_downsampled.squeeze(0).numpy() # Shape: (Channels, 224)
 
-        if self.cache_dir:
-            with open(cache_path, 'wb') as f:
-                pickle.dump(tensor_img, f)
+            # 3. Compute GAFs. 
+            num_channels = ts_downsampled.shape[0]
+            gafs = []
+            for c in range(num_channels):
+                gaf = compute_gaf(ts_downsampled[c, :])
+                gaf = (gaf - gaf.min()) / (gaf.max() - gaf.min() + 1e-8)
+                gafs.append(gaf)
+                
+            stacked = np.stack(gafs, axis=0) # Shape: (Channels, 224, 224)
+            tensor_img = torch.from_numpy(stacked).float()
+            
+            # Normalize: mean=0.5, std=0.5 across all channels
+            tensor_img = (tensor_img - 0.5) / 0.5
 
-        return tensor_img, label
+            if self.cache_dir:
+                with open(cache_path, 'wb') as f:
+                    pickle.dump(tensor_img, f)
+            
+            bag_tensors.append(tensor_img)
+
+        return torch.stack(bag_tensors), label
