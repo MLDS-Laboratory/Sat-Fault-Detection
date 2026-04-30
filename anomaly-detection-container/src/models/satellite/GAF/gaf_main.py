@@ -138,9 +138,11 @@ if __name__ == "__main__":
     mission_dir = data_dir(args.data_dir)
 
     if args.model == "scratch":
-        model = CNNFromScratch(num_classes=2, input_size=224); model_name="scratch"
+        model = CNNFromScratch(num_classes=2, input_size=224)
+        model_name="scratch"
     else:
-        model = get_pretrained_resnet(num_classes=2, freeze_early=True, unfreeze_stem=args.unfreeze_stem); model_name="pretrained"
+        model = get_pretrained_resnet(num_classes=2, freeze_early=True, unfreeze_stem=args.unfreeze_stem)
+        model_name="pretrained"
 
     hp = dict(
         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, mixed_precision=args.mixed_precision,

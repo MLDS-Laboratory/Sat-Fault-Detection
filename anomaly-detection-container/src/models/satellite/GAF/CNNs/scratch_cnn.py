@@ -1,4 +1,6 @@
 import torch.nn as nn
+import torch
+
 
 class CNNFromScratch(nn.Module):
     """
@@ -8,6 +10,9 @@ class CNNFromScratch(nn.Module):
     """
     def __init__(self, in_channels=1, num_classes=2, input_size=224):
         super(CNNFromScratch, self).__init__()
+        
+        # Optimized decision threshold buffer
+        self.register_buffer('threshold', torch.tensor(0.5))  
 
         self.features = nn.Sequential(
             # Takes in_channels (1 for regular GAFs, N for Stacked)

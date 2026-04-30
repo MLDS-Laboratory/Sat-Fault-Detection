@@ -9,6 +9,9 @@ class ResNet1DWrapper(nn.Module):
     """
     def __init__(self, num_classes=2, freeze_early=True, unfreeze_stem=True):
         super(ResNet1DWrapper, self).__init__()
+        
+        # Optimized decision threshold buffer
+        self.register_buffer('threshold', torch.tensor(0.5))
 
         # Load the base model
         self.model = models.resnet18(pretrained=True)

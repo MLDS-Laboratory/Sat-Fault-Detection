@@ -289,43 +289,39 @@ class ModelTrainer:
 
     def tune_threshold_cv(self, train_loader, val_loader, n_folds=5):
         self.model.eval()
-        
-        def collect(loader):
-            bags_all, labels_all = [], []
-            for bags, lbls in loader:
-                bags_all.extend(bags)
-                labels_all.extend(lbls.numpy())
-            return bags_all, labels_all
-            
-        t_bags, t_labels = collect(train_loader)
-        v_bags, v_labels = collect(val_loader)
-        
-        all_samples = t_bags + v_bags
-        all_labels = np.array(t_labels + v_labels)
-        
+
+        all_probs = []
+        all_labels = []
+
+        print(f"Pre-computing probabilities for {len(train_loader.dataset) + len(val_loader.dataset)} samples...")
+
+        with torch.no_grad():
+            for loader_name, loader in [("train", train_loader), ("val", val_loader)]:
+                for bags, labels in tqdm(loader, desc=f"Extracting {loader_name} probs"):
+                    bag_sizes = [b.shape[0] for b in bags]
+                    flat_inputs = torch.cat(bags).to(self.device)
+                    all_logits = self.model(flat_inputs)
+                    bag_logits = torch.split(all_logits, bag_sizes)
+
+                    for bl in bag_logits:
+                        # MIL: The bag's probability is the max of its instances
+                        prob = torch.max(torch.softmax(bl, dim=1)[:, 1]).item()
+                        all_probs.append(prob)
+
+                    all_labels.extend(labels.numpy())
+
+        all_probs = np.array(all_probs)
+        all_labels = np.array(all_labels)
+
         from sklearn.model_selection import StratifiedKFold
         skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
-        
-        print(f"Pre-computing probabilities for {len(all_samples)} samples...")
-        all_probs = []
-        with torch.no_grad():
-            bs = train_loader.batch_size
-            for i in range(0, len(all_samples), bs):
-                batch_bags = all_samples[i : i+bs]
-                bag_sizes = [b.shape[0] for b in batch_bags]
-                flat_inputs = torch.cat(batch_bags).to(self.device)
-                all_logits = self.model(flat_inputs)
-                bag_logits = torch.split(all_logits, bag_sizes)
-                for bl in bag_logits:
-                    all_probs.append(torch.max(torch.softmax(bl, dim=1)[:, 1]).item())
-        
-        all_probs = np.array(all_probs)
+
         best_thresholds = []
-        
+
         for fold, (train_idx, val_idx) in enumerate(skf.split(np.arange(len(all_labels)), all_labels)):
             f_probs = all_probs[val_idx]
             f_labels = all_labels[val_idx]
-            
+
             thresholds = np.arange(0.05, 0.95, 0.01)
             f_best_f05 = -1; f_best_t = 0.5
             for t in thresholds:
@@ -334,12 +330,18 @@ class ModelTrainer:
                     f_best_f05 = res['f05']; f_best_t = t
             best_thresholds.append(f_best_t)
             print(f"Fold {fold+1} Best Threshold: {f_best_t:.2f} (F0.5: {f_best_f05:.4f})")
-            
+
         self.best_threshold = np.median(best_thresholds)
         print(f"Final CV Median Threshold: {self.best_threshold:.2f}")
+
+        # Sync threshold to model buffer so it's saved in state_dict
+        if hasattr(self.model, 'threshold'):
+            self.model.threshold.fill_(self.best_threshold)
+            self.save_model(f"{self.model.__class__.__name__}_best.pth")
+            print(f"Model re-saved with optimized threshold: {self.best_threshold:.2f}")
+
         if self.wandb:
             self.wandb.log({"tuning/cv_median_threshold": self.best_threshold})
-
     def tune_threshold(self, val_loader):
         pass
 

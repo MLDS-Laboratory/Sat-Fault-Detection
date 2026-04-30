@@ -5,17 +5,21 @@ from torchvision import models
 class StackedResNet(nn.Module):
     def __init__(self, in_channels, num_classes=2, freeze_early=True, unfreeze_stem=True):
         super(StackedResNet, self).__init__()
+
+        # Optimized decision threshold buffer
+        self.register_buffer('threshold', torch.tensor(0.5))
+
         # The adaptive 1x1 projection block mapping N channels down to 3
         self.projection = nn.Conv2d(in_channels, 3, kernel_size=1)
         self.resnet = models.resnet18(pretrained=True)
-        
+
         if freeze_early:
             for name, param in self.resnet.named_parameters():
                 if unfreeze_stem and (name.startswith('conv1') or name.startswith('bn1')):
                     param.requires_grad = True
                 else:
                     param.requires_grad = False
-                
+
         self.resnet.fc = nn.Linear(self.resnet.fc.in_features, num_classes)
         for param in self.resnet.fc.parameters():
             param.requires_grad = True
@@ -27,8 +31,11 @@ class StackedResNet(nn.Module):
 class StackedScratchCNN(nn.Module):
     def __init__(self, in_channels, num_classes=2):
         super(StackedScratchCNN, self).__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),  
+
+        # Optimized decision threshold buffer
+        self.register_buffer('threshold', torch.tensor(0.5))
+
+        self.features = nn.Sequential(            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),  
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
