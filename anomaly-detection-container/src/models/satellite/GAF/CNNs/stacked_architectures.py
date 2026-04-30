@@ -3,17 +3,22 @@ import torch.nn as nn
 from torchvision import models
 
 class StackedResNet(nn.Module):
-    def __init__(self, in_channels, num_classes=2, freeze_early=True):
+    def __init__(self, in_channels, num_classes=2, freeze_early=True, unfreeze_stem=True):
         super(StackedResNet, self).__init__()
         # The adaptive 1x1 projection block mapping N channels down to 3
         self.projection = nn.Conv2d(in_channels, 3, kernel_size=1)
         self.resnet = models.resnet18(pretrained=True)
         
         if freeze_early:
-            for param in self.resnet.parameters():
-                param.requires_grad = False
+            for name, param in self.resnet.named_parameters():
+                if unfreeze_stem and (name.startswith('conv1') or name.startswith('bn1')):
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
                 
         self.resnet.fc = nn.Linear(self.resnet.fc.in_features, num_classes)
+        for param in self.resnet.fc.parameters():
+            param.requires_grad = True
 
     def forward(self, x):
         x = self.projection(x)
@@ -45,13 +50,13 @@ class StackedScratchCNN(nn.Module):
     def forward(self, x):
         return self.classifier(self.features(x))
 
-def load_transfer_model(model_type, weights_path, new_in_channels, num_classes=2):
+def load_transfer_model(model_type, weights_path, new_in_channels, num_classes=2, unfreeze_stem=True):
     """
     Loads a Mission 1 model, swaps the input dimensionality layer, 
     and freezes the rest of the network for Mission 2 fine-tuning.
     """
     if model_type == "pretrained":
-        model = StackedResNet(in_channels=new_in_channels, num_classes=num_classes, freeze_early=True)
+        model = StackedResNet(in_channels=new_in_channels, num_classes=num_classes, freeze_early=True, unfreeze_stem=unfreeze_stem)
         layer_to_ignore = 'projection'
     else:
         model = StackedScratchCNN(in_channels=new_in_channels, num_classes=num_classes)

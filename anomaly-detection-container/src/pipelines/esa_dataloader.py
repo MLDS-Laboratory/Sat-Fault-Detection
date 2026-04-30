@@ -153,12 +153,39 @@ class ESAMissionDataLoader:
 
         self.segments = segments
 
-    def get_train_test_segments(self):
+    def get_train_val_test_segments(self, train_ratio: float = 0.64, val_ratio: float = 0.16, test_ratio: float = 0.20):
         if self.segments is None: self._build_segments()
-        labels = [s["label"] for s in self.segments]
-        idx_train, idx_test = train_test_split(
-            np.arange(len(self.segments)), test_size=1.0 - self.train_ratio,
-            stratify=labels, random_state=self.random_state
-        )
-        return [self.segments[i] for i in idx_train], [self.segments[i] for i in idx_test]
+        
+        anom_segs = [s for s in self.segments if s['label'] == 1]
+        norm_segs = [s for s in self.segments if s['label'] == 0]
+        
+        self.rng.shuffle(anom_segs)
+        self.rng.shuffle(norm_segs)
+        
+        def split_list(lst, r1, r2):
+            n = len(lst)
+            idx1 = int(r1 * n)
+            idx2 = int((r1 + r2) * n)
+            return lst[:idx1], lst[idx1:idx2], lst[idx2:]
+
+        tr_anom, val_anom, te_anom = split_list(anom_segs, train_ratio, val_ratio)
+        tr_norm, val_norm, te_norm = split_list(norm_segs, train_ratio, val_ratio)
+
+        train = tr_anom + tr_norm
+        val   = val_anom + val_norm
+        test  = te_anom + te_norm
+
+        self.rng.shuffle(train)
+        self.rng.shuffle(val)
+        self.rng.shuffle(test)
+
+        print(f"Event-aware splits created: "
+              f"Train={len(train)} (anom={len(tr_anom)}), "
+              f"Val={len(val)} (anom={len(val_anom)}), "
+              f"Test={len(test)} (anom={len(te_anom)})")
+        
+        if len(tr_anom) < 10 or len(val_anom) < 10 or len(te_anom) < 10:
+             print("WARNING: One or more splits contains fewer than 10 anomaly events. Consider increasing sample budget.")
+
+        return train, val, test
 
