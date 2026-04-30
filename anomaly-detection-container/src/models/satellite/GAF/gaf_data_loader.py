@@ -173,13 +173,16 @@ class GAFDataset(Dataset):
         bag_ts = seg_dict['ts']  # This is now a list of arrays
         label = seg_dict['label']
 
+        # Manual cache versioning - edit this string only if the cache must be invalidated
+        CACHE_VERSION = "v1" 
+
         bag_imgs = []
         for i, ts in enumerate(bag_ts):
             # Unique cache key per window in the bag
             ch_key = seg_dict.get('channel', 'stacked')
             cache_path = None
             if self.cache_dir:
-                cache_path = os.path.join(self.cache_dir, f"gaf_{seg_dict['segment']}_{ch_key}_bag{i}.pkl")
+                cache_path = os.path.join(self.cache_dir, f"gaf_{seg_dict['segment']}_{ch_key}_bag{i}_{CACHE_VERSION}.pkl")
                 if os.path.exists(cache_path):
                     with open(cache_path, 'rb') as f:
                         img = pickle.load(f)
@@ -197,33 +200,36 @@ class GAFDataset(Dataset):
         return torch.stack(bag_imgs), label
         
     def _compute_gaf_image(self, ts):
+        # Optimized: Downsample the 1D signal to image_size BEFORE O(N^2) GAF computation
+        def downsample_1d(arr, n):
+            if len(arr) == n: return arr
+            return np.interp(np.linspace(0, len(arr)-1, n), np.arange(len(arr)), arr)
+
         # Handle 1D (Single Channel) or 2D (Stacked)
         if ts.ndim == 1:
-            gaf_img = compute_gaf(ts)
+            ts_resampled = downsample_1d(ts, self.image_size)
+            gaf_img = compute_gaf(ts_resampled)
             gaf_img = (gaf_img - gaf_img.min()) / (gaf_img.max() - gaf_img.min() + 1e-8)
             gaf_img = np.uint8(255 * gaf_img)
             img = Image.fromarray(gaf_img).resize((self.image_size, self.image_size)).convert("L")
         else:
             # Stacked Case: ts is [SeqLen, NumChannels]
-            # We compute GAF for each channel and stack them as RGB or similar
-            # But the models expect [Channels, H, W]. 
-            # For simplicity, we process each channel's GAF
             num_channels = ts.shape[1]
             gafs = []
             for c in range(num_channels):
-                g = compute_gaf(ts[:, c])
+                ts_c = downsample_1d(ts[:, c], self.image_size)
+                g = compute_gaf(ts_c)
                 g = (g - g.min()) / (g.max() - g.min() + 1e-8)
                 gafs.append(np.uint8(255 * g))
             
             # Combine into a multi-channel image
-            # PIL doesn't handle N-channels well, so we use numpy then resize
             combined = np.stack(gafs, axis=0) # [C, H, W]
-            # Resize each channel
+            # Resize each channel (already image_size, but kept for consistency)
             resized_gafs = []
             for c in range(num_channels):
                 img_c = Image.fromarray(combined[c]).resize((self.image_size, self.image_size))
                 resized_gafs.append(np.array(img_c))
             img = np.stack(resized_gafs, axis=0) # [C, H, W]
-            return img # Return as numpy array, transform will handle it
+            return img 
 
         return img

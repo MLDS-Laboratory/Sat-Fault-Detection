@@ -87,11 +87,11 @@ def run_main(model_name, model, hyperparams, mission_dir):
         ])
     else:
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=hyperparams['lr'])
-    
     # OneCycleLR Scheduler (Fix 7)
-    total_steps = hyperparams['epochs'] * len(dataloaders['train'])
+    acc_steps = 64
+    total_optimizer_steps = hyperparams['epochs'] * ((len(dataloaders['train']) + acc_steps - 1) // acc_steps)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=hyperparams['lr'], total_steps=total_steps,
+        optimizer, max_lr=hyperparams['lr'], total_steps=total_optimizer_steps,
         pct_start=0.1, anneal_strategy='cos'
     )
 
@@ -105,7 +105,7 @@ def run_main(model_name, model, hyperparams, mission_dir):
                            mixed_precision=hyperparams.get('mixed_precision', False),
                            wandb_run=run, scheduler=scheduler)
 
-    model_trained, history = trainer.train(num_epochs=hyperparams['epochs'], accumulation_steps=64)
+    model_trained, history = trainer.train(num_epochs=hyperparams['epochs'], accumulation_steps=acc_steps)
     test_acc, test_f05, test_cm = trainer.evaluate(phase='test')
 
     from utils.env_utils import model_dir
