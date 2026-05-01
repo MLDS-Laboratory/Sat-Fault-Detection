@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
     hp = dict(
         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, mixed_precision=args.mixed_precision,
-        loss_fn=CompoundLoss(focal_weight=0.5, f05_weight=0.5), loss_name="CompoundLoss",
+        loss_fn=CompoundLoss(focal_weight=0.3, f05_weight=0.7), loss_name="CompoundLoss",
         unfreeze_stem=args.unfreeze_stem
     )
     res = run_main(model_name, model, hp, mission_dir=mission_dir)

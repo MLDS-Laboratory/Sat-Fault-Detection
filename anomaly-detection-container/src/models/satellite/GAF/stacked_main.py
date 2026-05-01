@@ -40,7 +40,6 @@ def run_main(model_name, model, hyperparams, mission_dir):
 
     def downsample_split(segs, max_samples, name):
         if len(segs) <= max_samples: return segs
-        # stratified_sample from gaf_data_loader works for stacked too
         out, _ = stratified_sample(segs, [], max_samples, 0, oversample_anomaly=False)
         print(f"Downsampled {name} to {len(out)} samples")
         return out
@@ -68,7 +67,6 @@ def run_main(model_name, model, hyperparams, mission_dir):
     if "pretrained" in model_name and hyperparams.get('unfreeze_stem', False):
         stem_params = []
         head_params = []
-        # In StackedResNet, the model is in self.resnet
         target_model = model.resnet if hasattr(model, 'resnet') else model
         for name, param in target_model.named_parameters():
             if not param.requires_grad: continue
@@ -77,7 +75,6 @@ def run_main(model_name, model, hyperparams, mission_dir):
             else:
                 head_params.append(param)
         
-        # If StackedResNet, also include the projection 1x1 conv in head_params
         if hasattr(model, 'proj'):
             for param in model.proj.parameters():
                 if param.requires_grad: head_params.append(param)
@@ -88,6 +85,7 @@ def run_main(model_name, model, hyperparams, mission_dir):
         ])
     else:
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=hyperparams['lr'])
+    
     # OneCycleLR Scheduler (Fix 7)
     acc_steps = 64
     total_optimizer_steps = hyperparams['epochs'] * ((len(dataloaders['train']) + acc_steps - 1) // acc_steps)
@@ -120,13 +118,6 @@ def run_main(model_name, model, hyperparams, mission_dir):
         'epochs': hyperparams['epochs'],
         'batch_size': hyperparams['batch_size'],
         'lr': hyperparams['lr'],
-        'loss_fn': hyperparams['loss_name'],
-        'train_loss': history['train_loss'],
-        'train_acc': history['train_acc'],
-        'train_f1': history['train_f1'],
-        'val_loss': history['val_loss'],
-        'val_acc': history['val_acc'],
-        'val_f1': history['val_f1'],
         'test_acc': test_acc,
         'test_f05': test_f05,
         'test_confusion_matrix': test_cm.tolist()
@@ -164,7 +155,7 @@ if __name__ == "__main__":
 
     hp = dict(
         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, mixed_precision=args.mixed_precision,
-        loss_fn=CompoundLoss(focal_weight=0.5, f05_weight=0.5), loss_name="CompoundLoss",
+        loss_fn=CompoundLoss(focal_weight=0.3, f05_weight=0.7), loss_name="CompoundLoss",
         unfreeze_stem=args.unfreeze_stem
     )
     res = run_main(model_name, model, hp, mission_dir=mission_dir)
