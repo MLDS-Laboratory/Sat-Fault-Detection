@@ -29,38 +29,66 @@ class ModelTrainer:
             'val_f05':    [], 'val_precision': [], 'val_recall': [], 'val_tnr': []
         }
 
-    def compute_corrected_f05(self, y_true, y_pred_proba, threshold=0.5):
+    def compute_corrected_f05(self, y_true, y_pred_proba, event_ids, threshold=0.5):
         """
-        Computes the ESA-ADB corrected F0.5 score.
-        Corrected Precision = Precision * TNR
+        Computes the ESA-ADB corrected F0.5 score at the event level.
+        - Anomaly Events: Group samples with label=1 by event_id. 
+          TP_e = unique event_id where any sample >= threshold.
+          FN_e = unique event_id where no sample >= threshold.
+        - Nominal: Treat each sample with label=0 as independent.
+          FP_e = count of nominal samples misclassified as anomaly.
+          TNR_t = correctly identified nominal samples / total nominal samples.
         """
         y_pred = (y_pred_proba >= threshold).astype(int)
         
-        p = precision_score(y_true, y_pred, zero_division=0)
-        r = recall_score(y_true, y_pred, zero_division=0)
+        # 1. Handle Anomaly Events (label == 1)
+        anomaly_mask = (y_true == 1)
+        anom_event_ids = event_ids[anomaly_mask]
+        anom_preds = y_pred[anomaly_mask]
         
-        cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
-        if cm.shape == (2, 2):
-            tn, fp, fn, tp = cm.ravel()
-            tnr = tn / (tn + fp) if (tn + fp) > 0 else 0
-        else:
-            tnr = 0
-            
-        p_corr = p * tnr
+        unique_anom_events = np.unique(anom_event_ids)
+        tp_e = 0
+        fn_e = 0
+        
+        for eid in unique_anom_events:
+            # An event is a TP if ANY bag in the event is flagged
+            event_preds = anom_preds[anom_event_ids == eid]
+            if np.any(event_preds == 1):
+                tp_e += 1
+            else:
+                fn_e += 1
+        
+        # 2. Handle Nominal Segments (label == 0)
+        nominal_mask = (y_true == 0)
+        nominal_preds = y_pred[nominal_mask]
+        
+        tn_t = np.sum(nominal_preds == 0)
+        fp_e = np.sum(nominal_preds == 1)
+        total_nominal = len(nominal_preds)
+        
+        tnr_t = tn_t / total_nominal if total_nominal > 0 else 1.0
+        
+        # 3. Corrected Metrics
+        # Corrected Precision = (TP_e / (TP_e + FP_e)) * TNR_t
+        precision_corr = (tp_e / (tp_e + fp_e)) * tnr_t if (tp_e + fp_e) > 0 else 0.0
+        recall_e = tp_e / (tp_e + fn_e) if (tp_e + fn_e) > 0 else 0.0
+        
         beta = 0.5
         beta2 = beta**2
-        if (beta2 * p_corr + r) > 0:
-            f05_corr = (1 + beta2) * (p_corr * r) / (beta2 * p_corr + r)
+        if (beta2 * precision_corr + recall_e) > 0:
+            f05_corr = (1 + beta2) * (precision_corr * recall_e) / (beta2 * precision_corr + recall_e)
         else:
             f05_corr = 0.0
             
         return {
             'f05_corrected': f05_corr,
-            'f05_standard': fbeta_score(y_true, y_pred, beta=0.5, zero_division=0),
-            'precision': p,
-            'precision_corrected': p_corr,
-            'recall': r,
-            'tnr': tnr
+            'tp_e': tp_e,
+            'fn_e': fn_e,
+            'fp_e': fp_e,
+            'tnr_t': tnr_t,
+            'recall_e': recall_e,
+            'precision_corr': precision_corr,
+            'num_events': len(unique_anom_events)
         }
 
     def save_model(self, filename: str, save_entire_model=False):
@@ -92,8 +120,7 @@ class ModelTrainer:
                 self.model.train(phase == 'train')
 
                 running_loss = 0.0
-                all_preds, all_labels = [], []
-                all_proba = []
+                all_preds, all_labels, all_proba, all_event_ids = [], [], [], []
                 total_batches = len(self.dataloaders[phase])
                 
                 epoch_total_norm = 0.0
@@ -103,7 +130,7 @@ class ModelTrainer:
                 with tqdm(total=total_batches, desc=f'{phase.capitalize()}', ncols=100) as pbar:
                     t0 = time.time()
                     try:
-                        for i, (bags, labels) in enumerate(self.dataloaders[phase]):
+                        for i, (bags, labels, event_ids) in enumerate(self.dataloaders[phase]):
                             labels = labels.to(self.device)
                             bag_sizes = [b.shape[0] for b in bags]
                             inputs = torch.cat(bags).to(self.device)
@@ -184,6 +211,7 @@ class ModelTrainer:
                             all_preds.extend(preds.detach().cpu().numpy())
                             all_labels.extend(labels.detach().cpu().numpy())
                             all_proba.extend(proba.detach().cpu().numpy())
+                            all_event_ids.extend(event_ids.numpy())
                             batches_processed += 1
 
                             pbar.set_postfix({'loss': f'{loss.item():.4f}',
@@ -202,6 +230,8 @@ class ModelTrainer:
                 
                 y_true = np.array(all_labels)
                 y_prob = np.array(all_proba)
+                y_event_ids = np.array(all_event_ids)
+                
                 p_anom = y_prob[y_true == 1]
                 p_norm = y_prob[y_true == 0]
                 mean_p_anom = p_anom.mean() if len(p_anom) > 0 else 0.0
@@ -210,12 +240,13 @@ class ModelTrainer:
                 pred_rate = (np.array(all_preds) == 1).mean()
 
                 if phase == 'train':
-                    metrics = self.compute_corrected_f05(y_true, y_prob, threshold=0.5)
-                    train_recall = metrics['recall']
+                    # train metrics at 0.5
+                    m = self.compute_corrected_f05(y_true, y_prob, y_event_ids, threshold=0.5)
+                    train_recall_e = m['recall_e']
                     
                     if not use_f05:
-                        if train_recall == 0.0:
-                             print("Warning: Model has zero recall on training anomalies.")
+                        if train_recall_e == 0.0:
+                             print("Warning: Model has zero recall on training anomaly events.")
                         if pred_rate < 0.001:
                             self.nominal_collapse_count += 1
                             if self.nominal_collapse_count >= 2:
@@ -250,17 +281,17 @@ class ModelTrainer:
                     log_dict["train/avg_grad_norm"] = epoch_total_norm / num_grad_steps
 
                 if phase == 'val':
-                    # Fix 1 — Quick threshold sweep on val
+                    # Fix 1 — Quick threshold sweep on val using corrected F0.5
                     threshold_sweep = np.arange(0.5, 1.0, 0.05)
                     best_val_f05_corr = -1.0
                     best_val_t = 0.5
                     for t in threshold_sweep:
-                        m = self.compute_corrected_f05(y_true, y_prob, threshold=t)
+                        m = self.compute_corrected_f05(y_true, y_prob, y_event_ids, threshold=t)
                         if m['f05_corrected'] > best_val_f05_corr:
                             best_val_f05_corr = m['f05_corrected']
                             best_val_t = t
                     
-                    metrics_at_05 = self.compute_corrected_f05(y_true, y_prob, threshold=0.5)
+                    metrics_at_05 = self.compute_corrected_f05(y_true, y_prob, y_event_ids, threshold=0.5)
                     
                     # Use threshold-tuned value as checkpoint criterion
                     self.smoothed_f05 = 0.6 * best_val_f05_corr + 0.4 * self.smoothed_f05 if epoch > 0 else best_val_f05_corr
@@ -273,12 +304,12 @@ class ModelTrainer:
                         f"{phase}/f05_corrected_best": best_val_f05_corr,
                         f"{phase}/f05_best_threshold": best_val_t,
                         f"{phase}/f05_smoothed": self.smoothed_f05,
-                        f"{phase}/precision": metrics_at_05['precision'],
-                        f"{phase}/recall": metrics_at_05['recall'],
-                        f"{phase}/tnr": metrics_at_05['tnr']
+                        f"{phase}/precision_corr": metrics_at_05['precision_corr'],
+                        f"{phase}/recall_e": metrics_at_05['recall_e'],
+                        f"{phase}/tnr_t": metrics_at_05['tnr_t'],
+                        f"{phase}/num_ground_truth_events": metrics_at_05['num_events']
                     })
                     
-                    # Fix 3 — Probability distribution visualization
                     if self.wandb:
                         log_dict.update({
                             f"{phase}/probs_anomaly": wandb.Histogram(p_anom),
@@ -315,12 +346,12 @@ class ModelTrainer:
 
     def tune_threshold_cv(self, train_loader, val_loader, n_folds=5):
         self.model.eval()
-        all_probs, all_labels = [], []
+        all_probs, all_labels, all_event_ids = [], [], []
         print(f"Pre-computing probabilities for threshold tuning...")
 
         with torch.no_grad():
             for loader_name, loader in [("train", train_loader), ("val", val_loader)]:
-                for bags, labels in tqdm(loader, desc=f"Extracting {loader_name} probs"):
+                for bags, labels, event_ids in tqdm(loader, desc=f"Extracting {loader_name} probs"):
                     bag_sizes = [b.shape[0] for b in bags]
                     flat_inputs = torch.cat(bags).to(self.device)
                     all_logits = self.model(flat_inputs)
@@ -329,20 +360,22 @@ class ModelTrainer:
                         prob = torch.max(torch.softmax(bl, dim=1)[:, 1]).item()
                         all_probs.append(prob)
                     all_labels.extend(labels.numpy())
+                    all_event_ids.extend(event_ids.numpy())
 
         all_probs = np.array(all_probs)
         all_labels = np.array(all_labels)
+        all_event_ids = np.array(all_event_ids)
 
         from sklearn.model_selection import StratifiedKFold
         skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
         best_thresholds = []
 
         for fold, (train_idx, val_idx) in enumerate(skf.split(np.arange(len(all_labels)), all_labels)):
-            f_probs, f_labels = all_probs[val_idx], all_labels[val_idx]
+            f_probs, f_labels, f_event_ids = all_probs[val_idx], all_labels[val_idx], all_event_ids[val_idx]
             thresholds = np.arange(0.05, 0.95, 0.01)
             f_best_f05, f_best_t = -1.0, 0.5
             for t in thresholds:
-                res = self.compute_corrected_f05(f_labels, f_probs, threshold=t)
+                res = self.compute_corrected_f05(f_labels, f_probs, f_event_ids, threshold=t)
                 if res['f05_corrected'] > f_best_f05:
                     f_best_f05 = res['f05_corrected']; f_best_t = t
             best_thresholds.append(f_best_t)
@@ -364,8 +397,8 @@ class ModelTrainer:
 
     def evaluate(self, phase='test'):
         self.model.eval()
-        all_labels, all_proba = [], []
-        for bags, labels in self.dataloaders[phase]:
+        all_labels, all_proba, all_event_ids = [], [], []
+        for bags, labels, event_ids in self.dataloaders[phase]:
             bag_sizes = [b.shape[0] for b in bags]
             flat_inputs = torch.cat(bags).to(self.device)
             with torch.no_grad():
@@ -377,11 +410,13 @@ class ModelTrainer:
                     pooled_probs.append(torch.max(probs))
                 all_proba.extend(torch.stack(pooled_probs).cpu().numpy())
                 all_labels.extend(labels.numpy())
+                all_event_ids.extend(event_ids.numpy())
 
         y_true = np.array(all_labels)
         y_proba = np.array(all_proba)
+        y_event_ids = np.array(all_event_ids)
         
-        metrics = self.compute_corrected_f05(y_true, y_proba, threshold=self.best_threshold)
+        metrics = self.compute_corrected_f05(y_true, y_proba, y_event_ids, threshold=self.best_threshold)
         all_preds = (y_proba >= self.best_threshold).astype(int)
 
         acc = accuracy_score(y_true, all_preds)
@@ -390,21 +425,25 @@ class ModelTrainer:
         print(f"\n{phase.capitalize()} Results (Threshold={self.best_threshold:.2f}):")
         print(f"Accuracy: {acc:.4f}")
         print(f"Corrected F0.5 (event-wise): {metrics['f05_corrected']:.4f}")
-        print(f"Standard F0.5 (event-wise): {metrics['f05_standard']:.4f}")
-        print(f"Precision: {metrics['precision']:.4f}")
-        print(f"Recall: {metrics['recall']:.4f}")
-        print(f"TNR: {metrics['tnr']:.4f}")
-        print("Confusion Matrix:")
+        print(f"Precision Corr (event-wise): {metrics['precision_corr']:.4f}")
+        print(f"Recall (event-wise): {metrics['recall_e']:.4f}")
+        print(f"TNR (temporal): {metrics['tnr_t']:.4f}")
+        print(f"Ground Truth Events: {metrics['num_events']}")
+        print(f"TP Events: {metrics['tp_e']}, FN Events: {metrics['fn_e']}")
+        print("Confusion Matrix (at segment level):")
         print(cm)
         
         if self.wandb:
+            import wandb
             self.wandb.log({
                 f"{phase}/accuracy": acc,
                 f"{phase}/f05_corrected": metrics['f05_corrected'],
-                f"{phase}/f05_standard": metrics['f05_standard'],
-                f"{phase}/precision": metrics['precision'],
-                f"{phase}/recall": metrics['recall'],
-                f"{phase}/tnr": metrics['tnr'],
+                f"{phase}/precision_corr": metrics['precision_corr'],
+                f"{phase}/recall_e": metrics['recall_e'],
+                f"{phase}/tnr_t": metrics['tnr_t'],
+                f"{phase}/num_events": metrics['num_events'],
+                f"{phase}/tp_events": metrics['tp_e'],
+                f"{phase}/fn_events": metrics['fn_e'],
                 f"{phase}/confusion": wandb.plot.confusion_matrix(
                     y_true=y_true.tolist(), preds=all_preds.tolist(), class_names=["normal","anomaly"])
             })

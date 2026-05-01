@@ -118,6 +118,13 @@ def run_main(model_name, model, hyperparams, mission_dir):
         'epochs': hyperparams['epochs'],
         'batch_size': hyperparams['batch_size'],
         'lr': hyperparams['lr'],
+        'loss_fn': hyperparams['loss_name'],
+        'train_loss': history['train_loss'],
+        'train_acc': history['train_acc'],
+        'train_f1': history['train_f1'],
+        'val_loss': history['val_loss'],
+        'val_acc': history['val_acc'],
+        'val_f1': history['val_f1'],
         'test_acc': test_acc,
         'test_f05': test_f05,
         'test_confusion_matrix': test_cm.tolist()

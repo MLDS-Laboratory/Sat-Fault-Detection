@@ -84,7 +84,7 @@ class ESAMissionDataLoader:
             # ------------------------------------------------------------------
             # 2. Extract Anomalous Segments (with MIL splitting/padding)
             # ------------------------------------------------------------------
-            for _, lab in ch_labels.iterrows():
+            for event_id, lab in ch_labels.iterrows():
                 start, end = lab["StartTime"].tz_localize(None), lab["EndTime"].tz_localize(None)
                 event_dur = (end - start).total_seconds()
                 
@@ -124,7 +124,8 @@ class ESAMissionDataLoader:
                     if valid_bag:
                         segments.append({
                             "segment": seg_id, "channel": ch_name, "ts": valid_bag, 
-                            "label": 1, "sampling": self.target_sampling_sec, "train": 1
+                            "label": 1, "sampling": self.target_sampling_sec, "train": 1,
+                            "event_id": event_id
                         })
                         seg_id += 1
 
@@ -147,7 +148,8 @@ class ESAMissionDataLoader:
                     seg_slice = blk[i : i + target_pts]
                     segments.append({
                         "segment": seg_id, "channel": ch_name, "ts": [values[seg_slice]], 
-                        "label": 0, "sampling": self.target_sampling_sec, "train": 1
+                        "label": 0, "sampling": self.target_sampling_sec, "train": 1,
+                        "event_id": -1
                     })
                     seg_id += 1
 

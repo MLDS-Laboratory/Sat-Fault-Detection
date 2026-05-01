@@ -146,11 +146,12 @@ import torch
 def mil_collate(batch):
     """
     Custom collate function for MIL. 
-    Returns bags as a list (since they have variable sizes) and labels as a tensor.
+    Returns bags as a list, labels as a tensor, and event_ids as a tensor.
     """
     bags = [item[0] for item in batch]
     labels = torch.tensor([item[1] for item in batch])
-    return bags, labels
+    event_ids = torch.tensor([item[2] for item in batch])
+    return bags, labels, event_ids
 
 class GAFDataset(Dataset):
     """
@@ -172,6 +173,7 @@ class GAFDataset(Dataset):
         seg_dict = self.segments[idx]
         bag_ts = seg_dict['ts']  # This is now a list of arrays
         label = seg_dict['label']
+        event_id = seg_dict.get('event_id', -1)
 
         # Manual cache versioning - edit this string only if the cache must be invalidated
         CACHE_VERSION = "v1" 
@@ -197,7 +199,7 @@ class GAFDataset(Dataset):
                 img = self.transform(img)
             bag_imgs.append(img)
             
-        return torch.stack(bag_imgs), label
+        return torch.stack(bag_imgs), label, event_id
         
     def _compute_gaf_image(self, ts):
         # Optimized: Downsample the 1D signal to image_size BEFORE O(N^2) GAF computation

@@ -103,10 +103,10 @@ class ESAStackedDataLoader:
         anom_indices = np.where(anomaly_mask)[0]
         if len(anom_indices) > 0:
             blocks = np.split(anom_indices, np.where(np.diff(anom_indices) != 1)[0] + 1)
-            for blk in blocks:
+            for event_id, blk in enumerate(blocks):
                 event_pts = len(blk)
                 bag_ts = []
-                
+
                 if event_pts <= actual_pts:
                     # Centered Padding
                     center_idx = blk[0] + len(blk) // 2
@@ -126,7 +126,7 @@ class ESAStackedDataLoader:
 
                 valid_bag = [ts for ts in bag_ts if abs(len(ts) - actual_pts) < 5]
                 if valid_bag:
-                    self.segments.append({"segment": seg_id, "ts": valid_bag, "label": 1})
+                    self.segments.append({"segment": seg_id, "ts": valid_bag, "label": 1, "event_id": event_id})
                     seg_id += 1
 
         # 2. Chop Nominals
@@ -136,5 +136,5 @@ class ESAStackedDataLoader:
             for blk in blocks:
                 for i in range(0, len(blk) - actual_pts, actual_pts):
                     ts_segment = df_all.iloc[blk[i : i + actual_pts]].values
-                    self.segments.append({"segment": seg_id, "ts": [ts_segment], "label": 0})
+                    self.segments.append({"segment": seg_id, "ts": [ts_segment], "label": 0, "event_id": -1})
                     seg_id += 1
