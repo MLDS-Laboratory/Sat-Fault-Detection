@@ -115,14 +115,14 @@ class ModelTrainer:
             use_f05 = epoch >= 3
             if epoch == 3:
                 print("Warm-up complete. Switching to full CompoundLoss (focal + soft-F0.5).")
-
             for phase in ['train', 'val']:
                 self.model.train(phase == 'train')
 
                 running_loss = 0.0
-                all_preds, all_labels, all_proba, all_event_ids = [], [], [], []
+                all_preds, all_labels = [], []
+                all_proba, all_event_ids = [], []
                 total_batches = len(self.dataloaders[phase])
-                
+
                 epoch_total_norm = 0.0
                 num_grad_steps = 0
                 batches_processed = 0
@@ -415,6 +415,17 @@ class ModelTrainer:
         y_true = np.array(all_labels)
         y_proba = np.array(all_proba)
         y_event_ids = np.array(all_event_ids)
+        
+        # DEBUG: Check event distribution
+        print(f"\n[DEBUG {phase}] Total samples: {len(y_true)}")
+        print(f"[DEBUG {phase}] Anomaly samples (y_true==1): {np.sum(y_true == 1)}")
+        print(f"[DEBUG {phase}] Nominal samples (y_true==0): {np.sum(y_true == 0)}")
+        print(f"[DEBUG {phase}] Unique event IDs overall: {len(np.unique(y_event_ids))}")
+        print(f"[DEBUG {phase}] Unique event IDs in anomalies: {len(np.unique(y_event_ids[y_true == 1]))}")
+        print(f"[DEBUG {phase}] Event ID range: [{np.min(y_event_ids)}, {np.max(y_event_ids)}]")
+        unique_anom_ids = np.unique(y_event_ids[y_true == 1])
+        anom_event_counts = {eid: np.sum(y_event_ids[y_true == 1] == eid) for eid in unique_anom_ids[:5]}
+        print(f"[DEBUG {phase}] Sample counts per event (first 5): {anom_event_counts}")
         
         metrics = self.compute_corrected_f05(y_true, y_proba, y_event_ids, threshold=self.best_threshold)
         all_preds = (y_proba >= self.best_threshold).astype(int)

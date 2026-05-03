@@ -49,6 +49,10 @@ class ESAMissionDataLoader:
     def _build_segments(self):
         self._load_meta()
         
+        # Mapping for physical event IDs to integers
+        unique_ids = self.labels_df["ID"].unique().tolist()
+        id_map = {id_str: i for i, id_str in enumerate(unique_ids)}
+
         # 1. Determine target sampling rate (median across all channels)
         intervals = []
         ch_dir = os.path.join(self.dir, "channels")
@@ -84,7 +88,7 @@ class ESAMissionDataLoader:
             # ------------------------------------------------------------------
             # 2. Extract Anomalous Segments (with MIL splitting/padding)
             # ------------------------------------------------------------------
-            for event_id, lab in ch_labels.iterrows():
+            for _, lab in ch_labels.iterrows():
                 start, end = lab["StartTime"].tz_localize(None), lab["EndTime"].tz_localize(None)
                 event_dur = (end - start).total_seconds()
                 
@@ -125,7 +129,7 @@ class ESAMissionDataLoader:
                         segments.append({
                             "segment": seg_id, "channel": ch_name, "ts": valid_bag, 
                             "label": 1, "sampling": self.target_sampling_sec, "train": 1,
-                            "event_id": event_id
+                            "event_id": id_map[lab["ID"]]
                         })
                         seg_id += 1
 
@@ -149,7 +153,7 @@ class ESAMissionDataLoader:
                     segments.append({
                         "segment": seg_id, "channel": ch_name, "ts": [values[seg_slice]], 
                         "label": 0, "sampling": self.target_sampling_sec, "train": 1,
-                        "event_id": -1
+                        "event_id": -(seg_id + 1)
                     })
                     seg_id += 1
 

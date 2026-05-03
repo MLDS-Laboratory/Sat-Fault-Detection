@@ -102,10 +102,20 @@ class ESAStackedDataLoader:
         # 1. Chop Anomalies with MIL
         anom_indices = np.where(anomaly_mask)[0]
         if len(anom_indices) > 0:
+            # Mapping for physical event IDs to integers
+            unique_ids = labels_df["ID"].unique().tolist()
+            id_map = {id_str: i for i, id_str in enumerate(unique_ids)}
+            
             blocks = np.split(anom_indices, np.where(np.diff(anom_indices) != 1)[0] + 1)
-            for event_id, blk in enumerate(blocks):
+            for blk in blocks:
                 event_pts = len(blk)
                 bag_ts = []
+
+                # Determine which physical ID this block belongs to
+                mid_time = df_all.index[blk[len(blk)//2]]
+                matching_ids = labels_df[(labels_df["StartTime"] <= mid_time) & (labels_df["EndTime"] >= mid_time)]["ID"]
+                physical_id = matching_ids.iloc[0] if not matching_ids.empty else unique_ids[0]
+                integer_id = id_map[physical_id]
 
                 if event_pts <= actual_pts:
                     # Centered Padding
@@ -126,7 +136,10 @@ class ESAStackedDataLoader:
 
                 valid_bag = [ts for ts in bag_ts if abs(len(ts) - actual_pts) < 5]
                 if valid_bag:
-                    self.segments.append({"segment": seg_id, "ts": valid_bag, "label": 1, "event_id": event_id})
+                    self.segments.append({
+                        "segment": seg_id, "ts": valid_bag, "label": 1, 
+                        "event_id": integer_id
+                    })
                     seg_id += 1
 
         # 2. Chop Nominals
@@ -136,5 +149,8 @@ class ESAStackedDataLoader:
             for blk in blocks:
                 for i in range(0, len(blk) - actual_pts, actual_pts):
                     ts_segment = df_all.iloc[blk[i : i + actual_pts]].values
-                    self.segments.append({"segment": seg_id, "ts": [ts_segment], "label": 0, "event_id": -1})
+                    self.segments.append({
+                        "segment": seg_id, "ts": [ts_segment], "label": 0,
+                        "event_id": -(seg_id + 1)
+                    })
                     seg_id += 1
