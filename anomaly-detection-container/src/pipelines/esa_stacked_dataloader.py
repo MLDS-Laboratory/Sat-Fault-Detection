@@ -64,8 +64,8 @@ class ESAStackedDataLoader:
         channels_df = pd.read_csv(cfile)
         labels_df = pd.read_csv(lfile)
         
-        labels_df["StartTime"] = pd.to_datetime(labels_df["StartTime"])
-        labels_df["EndTime"] = pd.to_datetime(labels_df["EndTime"])
+        labels_df["StartTime"] = pd.to_datetime(labels_df["StartTime"]).dt.tz_localize(None)
+        labels_df["EndTime"] = pd.to_datetime(labels_df["EndTime"]).dt.tz_localize(None)
 
         # Calculate Anomaly Duration Statistics
         durations = (labels_df["EndTime"] - labels_df["StartTime"]).dt.total_seconds()

@@ -1,5 +1,6 @@
 import numpy as np
 from PIL import Image
+import torch
 from torch.utils.data import Dataset
 from models.satellite.GAF.gaf_transform import compute_gaf
 import os
@@ -197,6 +198,13 @@ class GAFDataset(Dataset):
 
             if self.transform:
                 img = self.transform(img)
+            
+            # Ensure img is a tensor
+            if isinstance(img, np.ndarray):
+                img = torch.from_numpy(img).float()
+            elif not isinstance(img, torch.Tensor):
+                img = torch.tensor(img, dtype=torch.float32)
+                
             bag_imgs.append(img)
             
         return torch.stack(bag_imgs), label, event_id
