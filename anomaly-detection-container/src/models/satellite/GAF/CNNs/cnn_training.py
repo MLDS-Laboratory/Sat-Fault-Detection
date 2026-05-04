@@ -439,7 +439,7 @@ class ModelTrainer:
         print(f"Precision Corr (event-wise): {metrics['precision_corr']:.4f}")
         print(f"Recall (event-wise): {metrics['recall_e']:.4f}")
         print(f"TNR (temporal): {metrics['tnr_t']:.4f}")
-        print(f"Ground Truth Events: {metrics['num_events']}")
+        print(f"Unique Physical Events in {phase.capitalize()}: {metrics['num_events']}")
         print(f"TP Events: {metrics['tp_e']}, FN Events: {metrics['fn_e']}")
         print("Confusion Matrix (at segment level):")
         print(cm)

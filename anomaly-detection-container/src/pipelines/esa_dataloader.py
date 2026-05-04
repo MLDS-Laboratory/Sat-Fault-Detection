@@ -162,20 +162,28 @@ class ESAMissionDataLoader:
     def get_train_val_test_segments(self, train_ratio: float = 0.64, val_ratio: float = 0.16, test_ratio: float = 0.20):
         if self.segments is None: self._build_segments()
         
+        # 1. Identify unique anomaly events
         anom_segs = [s for s in self.segments if s['label'] == 1]
-        norm_segs = [s for s in self.segments if s['label'] == 0]
+        unique_event_ids = sorted(list(set(s['event_id'] for s in anom_segs)))
+        self.rng.shuffle(unique_event_ids)
         
-        self.rng.shuffle(anom_segs)
-        self.rng.shuffle(norm_segs)
-        
-        def split_list(lst, r1, r2):
+        def split_indices(lst, r1, r2):
             n = len(lst)
             idx1 = int(r1 * n)
             idx2 = int((r1 + r2) * n)
             return lst[:idx1], lst[idx1:idx2], lst[idx2:]
 
-        tr_anom, val_anom, te_anom = split_list(anom_segs, train_ratio, val_ratio)
-        tr_norm, val_norm, te_norm = split_list(norm_segs, train_ratio, val_ratio)
+        tr_ids, val_ids, te_ids = split_indices(unique_event_ids, train_ratio, val_ratio)
+        
+        # 2. Assign segments based on event_id
+        tr_anom = [s for s in anom_segs if s['event_id'] in tr_ids]
+        val_anom = [s for s in anom_segs if s['event_id'] in val_ids]
+        te_anom = [s for s in anom_segs if s['event_id'] in te_ids]
+
+        # 3. Split nominal segments separately
+        norm_segs = [s for s in self.segments if s['label'] == 0]
+        self.rng.shuffle(norm_segs)
+        tr_norm, val_norm, te_norm = split_indices(norm_segs, train_ratio, val_ratio)
 
         train = tr_anom + tr_norm
         val   = val_anom + val_norm
@@ -185,13 +193,17 @@ class ESAMissionDataLoader:
         self.rng.shuffle(val)
         self.rng.shuffle(test)
 
-        print(f"Event-aware splits created: "
-              f"Train={len(train)} (anom={len(tr_anom)}), "
-              f"Val={len(val)} (anom={len(val_anom)}), "
-              f"Test={len(test)} (anom={len(te_anom)})")
+        print(f"\n--- Event-Aware Split Statistics ---")
+        print(f"Total Unique Events: {len(unique_event_ids)}")
+        print(f"Train: {len(train)} segments, {len(tr_ids)} unique events")
+        print(f"Val:   {len(val)} segments, {len(val_ids)} unique events")
+        print(f"Test:  {len(test)} segments, {len(te_ids)} unique events")
         
-        if len(tr_anom) < 10 or len(val_anom) < 10 or len(te_anom) < 10:
-             print("WARNING: One or more splits contains fewer than 10 anomaly events. Consider increasing sample budget.")
+        # Safety Assertion for Mission 1
+        if "Mission1" in self.dir:
+            # Mission 1 has ~200 events, 20% should be ~40. Allowing 30-50 for randomness.
+            if not (30 <= len(te_ids) <= 60):
+                print(f"WARNING: Unexpected test event count ({len(te_ids)}). Expected ~40.")
 
         return train, val, test
 
